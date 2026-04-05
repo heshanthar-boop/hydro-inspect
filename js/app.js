@@ -13,6 +13,12 @@ const App = {
     this.navigate('new-inspection');
     this.registerServiceWorker();
     this.updateSyncStatus('offline');
+
+    // Firebase sync — sign-in button in header
+    FirebaseSync.renderSignInButton(document.getElementById('header-signin'));
+    FirebaseSync.init(user => {
+      if (user) FirebaseSync.syncAll();
+    });
   },
 
   // ===== Navigation =====

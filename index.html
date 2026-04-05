@@ -12,6 +12,10 @@
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Firebase compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <!-- jsPDF for report generation -->
@@ -29,7 +33,8 @@
         <h1 class="header-title">HydroInspect</h1>
       </div>
       <div class="header-right">
-        <span id="sync-status" class="sync-badge" title="Local storage">Offline</span>
+        <span id="sync-status" class="sync-badge" title="Local storage">Local</span>
+        <div id="header-signin"></div>
       </div>
     </header>
 
@@ -87,6 +92,7 @@
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
+  <script src="js/firebase-sync.js"></script>
   <script src="js/store.js"></script>
   <script src="js/calculations.js"></script>
   <script src="js/relay489.js"></script>

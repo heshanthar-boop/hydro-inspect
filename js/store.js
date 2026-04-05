@@ -84,7 +84,10 @@ const Store = {
     return new Promise((resolve, reject) => {
       const tx = db.transaction('inspections', 'readwrite');
       const req = tx.objectStore('inspections').put(inspection);
-      req.onsuccess = () => resolve(inspection);
+      req.onsuccess = () => {
+        if (typeof FirebaseSync !== 'undefined') FirebaseSync.onInspectionSaved(inspection);
+        resolve(inspection);
+      };
       req.onerror = () => reject(req.error);
     });
   },
