@@ -1,0 +1,54 @@
+{
+  "name": "hydroinspect-desktop",
+  "version": "1.0.0",
+  "description": "HydroInspect desktop app wrapper",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node node_modules/electron/cli.js .",
+    "make-icon": "node scripts/make-icon.js",
+    "pack": "npm run make-icon && node node_modules/electron-builder/cli.js --dir",
+    "dist": "npm run make-icon && node node_modules/electron-builder/cli.js --win nsis",
+    "portable": "npm run make-icon && node scripts/build-portable.js"
+  },
+  "build": {
+    "appId": "com.hydroinspect.app",
+    "productName": "HydroInspect",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "manifest.json",
+      "sw.js",
+      "css/**/*",
+      "js/**/*",
+      "icons/**/*",
+      "firestore.rules",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "app-builder-bin": "^5.0.0-alpha.10",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-packager": "^17.1.2",
+    "png-to-ico": "^2.1.8"
+  }
+}
