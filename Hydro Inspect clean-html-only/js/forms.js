@@ -12,6 +12,7 @@ const Forms = {
   // Initialize a new or existing inspection form
   async init(inspection, container) {
     this.currentInspection = inspection;
+    await Calc.loadMeterConfig();
     this.previousInspection = await Store.getPreviousInspection(inspection.general.date);
     this.diffs = this.previousInspection
       ? Calc.calculateKWhDiffs(inspection, this.previousInspection)
@@ -309,7 +310,10 @@ const Forms = {
   // ===== Section: Power Analyzers =====
 
   renderPowerAnalyzers(insp, prev, diffs, prevLabel) {
-    const d = diffs?.powerAnalyzers || {};
+    const field = (key) => {
+      const meta = Calc.channelMeta(key);
+      return this.renderAnalyzerField(insp, prev, diffs, key, meta.label, meta.path);
+    };
     return `
     <div class="card">
       <div class="card-header" data-toggle="analyzers">
@@ -319,27 +323,55 @@ const Forms = {
       <div class="card-body" id="section-analyzers">
         ${prevLabel}
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Transformer Panel (Total) ${Calc.diffBadgeHTML(d.transformerPanel)}</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-field="powerAnalyzers.transformerPanelKWh" value="${insp.powerAnalyzers.transformerPanelKWh}" step="0.01"><span class="input-unit">kWh</span></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">No.1 Generator Panel ${Calc.diffBadgeHTML(d.gen1Panel)}</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-field="powerAnalyzers.gen1PanelKWh" value="${insp.powerAnalyzers.gen1PanelKWh}" step="0.01"><span class="input-unit">kWh</span></div>
-          </div>
+          ${field('transformerPanel')}
+          ${field('gen1Panel')}
         </div>
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">No.2 Generator Panel ${Calc.diffBadgeHTML(d.gen2Panel)}</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-field="powerAnalyzers.gen2PanelKWh" value="${insp.powerAnalyzers.gen2PanelKWh}" step="0.01"><span class="input-unit">kWh</span></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">CEB LV Panel ${Calc.diffBadgeHTML(d.cebLVPanel)}</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-field="powerAnalyzers.cebLVPanelKWh" value="${insp.powerAnalyzers.cebLVPanelKWh}" step="0.01"><span class="input-unit">kWh</span></div>
-          </div>
+          ${field('gen2Panel')}
+          ${field('cebLVPanel')}
         </div>
       </div>
     </div>`;
+  },
+
+  // One analyzer reading, with the period difference bridged across any meter swap
+  renderAnalyzerField(insp, prev, diffs, key, label, path) {
+    const value = Calc._valueAt(insp, path) ?? '';
+    const d = diffs?.powerAnalyzers?.[key];
+    const detail = diffs?.analyzerMeters?.[key];
+    const crossed = detail?.changes || [];
+    const onNewMeter = Calc.isNewMeter(key, insp.general.date);
+
+    let chip = '';
+    if (crossed.length) chip = '<span class="meter-chip meter-chip-new">NEW METER</span>';
+    else if (onNewMeter) chip = '<span class="meter-chip">New meter</span>';
+
+    let note = '';
+    if (crossed.length) {
+      const change = crossed[crossed.length - 1];
+      const prevReading = prev ? Calc._num(Calc._valueAt(prev, path)) : null;
+      const closing = Calc.oldFinalOf(change, prevReading);
+      note = `
+        <div class="meter-change-note">
+          <strong>Meter replaced after ${Calc.formatDateFull(change.date)} reading.</strong>
+          Old meter closed at ${Calc.formatNumber(closing)} kWh; new meter started at ${Calc.formatNumber(Calc.newStartOf(change))} kWh.
+          <br>Period consumption bridged: ${Calc.formatNumber(detail.oldRun)} (old) + ${Calc.formatNumber(detail.newRun)} (new)
+          = <strong>${Calc.formatNumber(detail.value)} kWh</strong>
+        </div>`;
+    } else if (typeof d === 'number' && d < 0) {
+      note = `
+        <div class="meter-change-warn">
+          &#9888; Reading is below the previous visit. If this meter was replaced, add the swap
+          under Settings &rarr; Meter Replacements so the difference is bridged.
+        </div>`;
+    }
+
+    return `
+      <div class="form-group">
+        <label class="form-label">${label} ${Calc.diffBadgeHTML(d)} ${chip}</label>
+        <div class="input-with-unit"><input type="number" class="form-input" data-field="${path}" value="${value}" step="0.01"><span class="input-unit">kWh</span></div>
+        ${note}
+      </div>`;
   },
 
   // ===== Section: Switchgear (with trip count sync) =====

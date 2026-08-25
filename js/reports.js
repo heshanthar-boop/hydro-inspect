@@ -10,6 +10,7 @@ const Reports = {
     const margin = 15;
     const contentWidth = pageWidth - margin * 2;
     let y = 15;
+    await Calc.loadMeterConfig();
     const prev = await Store.getPreviousInspection(inspection.general.date);
     const diffs = prev ? Calc.calculateKWhDiffs(inspection, prev) : null;
     const settings = await Store.getSettings();
@@ -85,6 +86,19 @@ const Reports = {
       const lines = doc.splitTextToSize(String(text), contentWidth - 4);
       doc.text(lines, margin + 2, y);
       y += lines.length * 4 + 2;
+    };
+
+    const addNote = (text) => {
+      if (!text) return;
+      checkPage(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 53, 15);
+      const lines = doc.splitTextToSize(String(text), contentWidth - 8);
+      doc.text(lines, margin + 6, y);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      y += lines.length * 3.6 + 2;
     };
 
     const addAlertRow = (label, value, unit = '') => {
@@ -171,10 +185,21 @@ const Reports = {
 
     addSubTitle('Power Analyzers');
     const pa = diffs?.powerAnalyzers || {};
-    addRowWithDiff('Transformer Panel (Total)', inspection.powerAnalyzers.transformerPanelKWh, pa.transformerPanel);
-    addRowWithDiff('No.1 Generator Panel', inspection.powerAnalyzers.gen1PanelKWh, pa.gen1Panel);
-    addRowWithDiff('No.2 Generator Panel', inspection.powerAnalyzers.gen2PanelKWh, pa.gen2Panel);
-    addRowWithDiff('CEB LV Panel', inspection.powerAnalyzers.cebLVPanelKWh, pa.cebLVPanel);
+    const paMeters = diffs?.analyzerMeters || {};
+    Calc.METER_CHANNELS.forEach(ch => {
+      addRowWithDiff(ch.label, Calc._valueAt(inspection, ch.path), pa[ch.key]);
+      // Explain any bridged difference so the figure can be checked against the meters
+      const detail = paMeters[ch.key];
+      const crossed = detail?.changes || [];
+      if (crossed.length) {
+        const change = crossed[crossed.length - 1];
+        const prevReading = prev ? Calc._num(Calc._valueAt(prev, ch.path)) : null;
+        addNote(`Meter replaced after ${Calc.formatDateFull(change.date)}: old closed at `
+          + `${Calc.formatNumber(Calc.oldFinalOf(change, prevReading))} kWh, new started at `
+          + `${Calc.formatNumber(Calc.newStartOf(change))} kWh. Difference bridged `
+          + `(${Calc.formatNumber(detail.oldRun)} old + ${Calc.formatNumber(detail.newRun)} new).`);
+      }
+    });
 
     // ===== Switchgear =====
     addTitle('III. Switchgear & Transformers');

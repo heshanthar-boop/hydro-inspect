@@ -19,6 +19,15 @@ const Store = {
     emailRecipients: '',
     breakerTripAlertThreshold: 5,
     genHoursAlertMargin: 1000,
+
+    // Panel meters that were physically swapped. `date` is the last reading taken on the
+    // old meter — anything recorded after it belongs to the new one. Leave `oldFinal`
+    // blank to use the reading already stored for that date.
+    meterChanges: [
+      { id: 'mc_2026_08_06_transformer', channel: 'transformerPanel', date: '2026-08-06', oldFinal: '', newStart: '0', note: 'New meter fitted after 06 Aug 2026 reading' },
+      { id: 'mc_2026_08_06_gen1',        channel: 'gen1Panel',        date: '2026-08-06', oldFinal: '', newStart: '0', note: 'New meter fitted after 06 Aug 2026 reading' },
+      { id: 'mc_2026_08_06_gen2',        channel: 'gen2Panel',        date: '2026-08-06', oldFinal: '', newStart: '0', note: 'New meter fitted after 06 Aug 2026 reading' },
+    ],
   },
 
   // Open (or upgrade) the database

@@ -12,6 +12,7 @@ const Analytics = {
 
   async render(container) {
     this.destroyCharts();
+    await Calc.loadMeterConfig();
     const inspections = await Store.getInspections();
 
     if (inspections.length < 2) {

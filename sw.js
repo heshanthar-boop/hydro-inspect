@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydroinspect-v3';
+const CACHE_NAME = 'hydroinspect-v4';
 
 // Use relative paths so it works on GitHub Pages subpath
 const LOCAL_ASSETS = [
