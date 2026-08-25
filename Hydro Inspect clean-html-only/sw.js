@@ -1,4 +1,5 @@
-const CACHE_NAME = 'hydroinspect-v4';
+const CACHE_NAME = 'hydroinspect-v5';
+const APP_VERSION = '2.1.0';
 
 // Use relative paths so it works on GitHub Pages subpath
 const LOCAL_ASSETS = [
@@ -63,26 +64,71 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch - serve from cache, fallback to network
+// Let the page ask which build is running, and let it skip the waiting phase
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'GET_VERSION' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ version: APP_VERSION, cache: CACHE_NAME });
+  }
+  if (data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Put a fresh copy in the cache, ignoring failures (offline, bad response)
+function _store(request, response) {
+  if (!response || !response.ok) return response;
+  const clone = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
+  return response;
+}
+
+// Network first, falling back to cache. Used for our own HTML/JS/CSS so a deploy
+// actually reaches the app; the timeout keeps a flaky link from stalling the load.
+function _networkFirst(request, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+
+    const timer = setTimeout(() => {
+      caches.match(request).then(cached => { if (cached) done(cached); });
+    }, timeoutMs);
+
+    fetch(request)
+      .then(response => { clearTimeout(timer); done(_store(request, response)); })
+      .catch(() => {
+        clearTimeout(timer);
+        caches.match(request).then(cached => {
+          if (cached) return done(cached);
+          if (request.mode === 'navigate') {
+            return caches.match('./index.html').then(html => done(html || Response.error()));
+          }
+          done(Response.error());
+        });
+      });
+  });
+}
+
+// Cache first. Used for the versioned CDN libraries, whose URLs never change content.
+function _cacheFirst(request) {
+  return caches.match(request).then(cached => {
+    if (cached) return cached;
+    return fetch(request).then(response => _store(request, response));
+  });
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('googleapis.com')) return;
+  if (event.request.url.includes('gstatic.com/firebasejs')) {
+    return event.respondWith(_cacheFirst(event.request));
+  }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
+  if (event.request.url.startsWith(self.location.origin)) {
+    // Our own files change on every deploy, so always look for a newer copy first
+    event.respondWith(_networkFirst(event.request, 3000));
+    return;
+  }
 
-      return fetch(event.request).then((response) => {
-        if (response.ok && (event.request.url.startsWith(self.location.origin) || CDN_ASSETS.includes(event.request.url))) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
-  );
+  if (CDN_ASSETS.includes(event.request.url)) {
+    event.respondWith(_cacheFirst(event.request));
+  }
 });

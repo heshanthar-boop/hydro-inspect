@@ -3,6 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
+  VERSION: '2.1.0',
   currentPage: 'new-inspection',
   editingInspectionId: null,
 
@@ -310,14 +311,25 @@ const App = {
         <input type="file" id="import-file" accept=".json" class="hidden">
       </div>
 
+      <div class="settings-group mt-16">
+        <h3>App Version</h3>
+        <p class="text-sm text-muted mb-8">
+          Running <strong>v${this.VERSION}</strong>. If a fix you expect is missing, the app may be
+          serving files cached on this device - force an update to pull the latest.
+        </p>
+        <button class="btn btn-outline btn-block" id="force-update">Force update &amp; reload</button>
+      </div>
+
       <div class="text-center mt-16 text-muted text-sm">
-        <p>HydroInspect v2.0</p>
+        <p>HydroInspect v${this.VERSION}</p>
         <p>Mini Hydro Plant Inspection App</p>
         <p>${Forms.esc(settings.plantName)}</p>
       </div>
     `;
 
     this.bindMeterChangeEvents(container);
+
+    container.querySelector('#force-update').addEventListener('click', () => this.forceUpdate());
 
     container.querySelector('#save-settings').addEventListener('click', async () => {
       await Store.saveSettings({
@@ -544,13 +556,50 @@ const App = {
 
   // ===== PWA Service Worker =====
   registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(() => {
-        console.log('Service Worker registered');
-      }).catch(err => {
-        console.log('SW registration failed:', err);
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Look for a new build now, then hourly, so a deploy lands without a manual clear
+      reg.update().catch(() => {});
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+
+      reg.addEventListener('updatefound', () => {
+        const incoming = reg.installing;
+        if (!incoming) return;
+        incoming.addEventListener('statechange', () => {
+          if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+            this.toast('Updating to the latest version...');
+          }
+        });
       });
+    }).catch(err => console.log('SW registration failed:', err));
+
+    // The new worker has taken over - reload once so every file comes from it
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  },
+
+  // Drop every cached file and re-register, for when an old build is stuck
+  async forceUpdate() {
+    this.toast('Clearing cached app files...');
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(n => caches.delete(n)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+    } catch (err) {
+      console.warn('Force update failed:', err);
     }
+    // Bypass the HTTP cache as well
+    window.location.replace(window.location.pathname + '?updated=' + Date.now());
   },
 };
 
