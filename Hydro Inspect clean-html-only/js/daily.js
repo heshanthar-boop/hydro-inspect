@@ -7,12 +7,14 @@ const Daily = {
     {key:'transformer',label:'Transformer panel',meter:'transformerPanel'},
     {key:'lt',label:'LT meter (CEB LV panel)',meter:'cebLVPanel'}
   ],
-  previous(record, records) { return records.find(r=>r.plant===record.plant && !r.draft && r.date<record.date) || null; },
+  stamp(record) { return record.date+'T'+(record.time || '00:00'); },
+  sort(records) { return [...records].sort((a,b)=>this.stamp(b).localeCompare(this.stamp(a))); },
+  previous(record, records) { return this.sort(records).find(r=>r.plant===record.plant && !r.draft && this.stamp(r)<this.stamp(record)) || null; },
   calculate(record, records) {
     const previous=this.previous(record, [...records].sort((a,b)=>b.date.localeCompare(a.date)));
     const values={},warnings=[];
     if(!previous) return {previous:null,days:null,values,warnings};
-    const days=(new Date(record.date)-new Date(previous.date))/86400000;
+    const days=(new Date(this.stamp(record)+'+05:30')-new Date(this.stamp(previous)+'+05:30'))/86400000;
     for(const ch of this.channels) {
       const c=Calc._num(record.readings[ch.key]),p=Calc._num(previous.readings[ch.key]);
       let value=c===null || p===null ? null : c-p;
@@ -34,14 +36,15 @@ const Daily = {
     let records=await Store.getDailyReadings();
     const plants=[...new Set([settings.plantName,...records.map(r=>r.plant)])];
     container.innerHTML=`<div class="page-intro"><span class="eyebrow">OPERATOR DAILY LOG</span><h1>Daily meter readings</h1><p>Enter cumulative kWh readings at a consistent time each day. Daily differences are calculated automatically.</p></div>
-      <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label><input class="form-input" id="daily-operator" required placeholder="Operator name"></div></div>
+      <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label><input class="form-input" id="daily-operator" list="daily-operators" required placeholder="Choose or enter operator name"><datalist id="daily-operators">${[...new Set(records.map(r=>r.operator).filter(Boolean))].map(name=>`<option value="${Forms.esc(name)}">`).join('')}</datalist></div></div>
       <div class="form-row"><div class="form-group"><label class="form-label">Reading date</label><input class="form-input" type="date" id="daily-date" required value="${DateEntry.localDate()}"></div><div class="form-group"><label class="form-label">Reading time</label><input class="form-input" type="time" id="daily-time" required value="${DateEntry.localTime()}"></div></div>
       <div class="daily-save-bar"><span id="daily-auto-state" role="status">Ready for entry</span><span id="daily-progress">0 / 6 readings</span></div><p id="daily-existing" class="form-hint" role="status"></p><div class="form-row daily-meter-grid">${this.channels.map(ch=>`<div class="form-group"><label class="form-label">${ch.label} — cumulative</label><div class="input-with-unit"><input type="number" class="form-input" data-daily="${ch.key}" min="0" step="0.01" required placeholder="0.00"><span class="input-unit">kWh</span></div></div>`).join('')}</div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="daily-notes" placeholder="Meter change, outage, unusual reading…"></textarea></div>
-      <div id="daily-preview"></div><button type="submit" class="btn btn-primary btn-block" id="daily-save">Finish daily entry</button><p class="form-hint">Changes save automatically on this device. Incomplete entries stay as drafts. One entry per plant per day. Selecting an existing day loads its readings for correction. Saved locally; sign in to sync with the same account on another device.</p></form>
-      <div class="chart-container"><div class="flex-between"><h3>Daily history</h3><button type="button" class="btn btn-outline btn-sm" id="daily-csv">Download CSV</button></div><div id="daily-history"></div></div>`;
+      <div id="daily-preview"></div><button type="submit" class="btn btn-primary btn-block" id="daily-save">Finish daily entry</button><p class="form-hint">Changes save automatically on this device. Incomplete entries stay as drafts. Multiple readings per day are supported. Use New reading for the next meter visit. Times are plant local time (Sri Lanka). Visitor entries are traced to this browser.</p></form>
+      <div class="chart-container"><div class="flex-between"><h3>Record-to-record comparisons</h3><button type="button" class="btn btn-primary btn-sm" id="daily-new">New reading</button><button type="button" class="btn btn-outline btn-sm" id="daily-csv">Download CSV</button></div><div id="daily-history"></div></div>`;
     const form=container.querySelector('#daily-form');
-    const collect=()=>({id:'daily_'+encodeURIComponent(form.querySelector('#daily-plant').value.trim())+'_'+form.querySelector('#daily-date').value,plant:form.querySelector('#daily-plant').value.trim(),date:form.querySelector('#daily-date').value,time:form.querySelector('#daily-time').value,operator:form.querySelector('#daily-operator').value.trim(),notes:form.querySelector('#daily-notes').value,readings:Object.fromEntries([...form.querySelectorAll('[data-daily]')].map(el=>[el.dataset.daily,el.value]))});
+    let activeId='daily_'+crypto.randomUUID();
+    const collect=()=>({id:activeId,plant:form.querySelector('#daily-plant').value.trim(),date:form.querySelector('#daily-date').value,time:form.querySelector('#daily-time').value,operator:form.querySelector('#daily-operator').value.trim(),notes:form.querySelector('#daily-notes').value,readings:Object.fromEntries([...form.querySelectorAll('[data-daily]')].map(el=>[el.dataset.daily,el.value]))});
     let queue=Promise.resolve();
     let debounce;
     const state=form.querySelector('#daily-auto-state');
@@ -54,8 +57,9 @@ const Daily = {
       if(invalid){ invalid.setAttribute('aria-invalid','true'); state.textContent='Check the highlighted reading — changes not saved'; return queue; }
       form.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
       if(!records.some(x=>x.id===r.id) && !r.operator && !r.notes && Object.values(r.readings).every(v=>v==='')) { state.textContent='Ready for entry'; return queue; }
+      if(records.some(x=>x.id!==r.id && x.plant===r.plant && this.stamp(x)===this.stamp(r))) {state.textContent='A reading already exists at this time. Open it or choose another time.';return queue;}
       r.draft=!r.operator || !r.time || Object.values(r.readings).some(value=>value==='');
-      records=[r,...records.filter(x=>x.id!==r.id)].sort((a,b)=>b.date.localeCompare(a.date));
+      records=this.sort([r,...records.filter(x=>x.id!==r.id)]);
       state.textContent='Saving…';
       queue=queue.catch(()=>{}).then(()=>Store.saveDailyReading(r)).then(()=>{
         if(form.isConnected) { if(JSON.stringify(collect())===fingerprint) state.textContent=r.draft ? 'Draft saved on this device' : 'Saved on this device'; refresh(); }
@@ -69,16 +73,18 @@ const Daily = {
     };
     const load=()=>{
       clearTimeout(debounce);
-      const r=collect(),existing=records.find(x=>x.id===r.id);
+      const r=collect(),existing=records.find(x=>x.id===activeId);
       form.querySelectorAll('[data-daily]').forEach(el=>el.value=existing?.readings[el.dataset.daily] ?? '');
       form.querySelector('#daily-time').value=existing?.time || DateEntry.localTime();
       form.querySelector('#daily-notes').value=existing?.notes || '';
       if(existing) form.querySelector('#daily-operator').value=existing.operator || '';
-      form.querySelector('#daily-existing').textContent=existing ? 'Saved entry loaded. Saving will update this day.' : 'New daily entry.';
+      form.querySelector('#daily-existing').textContent=existing ? 'Saved entry loaded. Saving will update this record.' : 'New daily entry.';
       state.textContent=existing ? (existing.draft ? 'Saved draft loaded' : 'Saved entry loaded') : 'Ready for entry';
       refresh();
     };
-    form.querySelector('#daily-date').addEventListener('change',load);form.querySelector('#daily-plant').addEventListener('change',load);
+    form.querySelector('#daily-date').addEventListener('change',autosave);form.querySelector('#daily-plant').addEventListener('change',refresh);
+    container.querySelector('#daily-new').addEventListener('click',async()=>{const pending=autosave();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=true);await pending;activeId='daily_'+crypto.randomUUID();form.querySelector('#daily-date').value=DateEntry.localDate();load();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=false);form.querySelector('[data-daily]').focus();});
+    container.querySelector('#daily-history').addEventListener('click',async e=>{const btn=e.target.closest('[data-load-daily]');if(!btn)return;await autosave();const r=records.find(x=>x.id===btn.dataset.loadDaily);if(!r || !Access.canEditDaily(r))return;activeId=r.id;form.querySelector('#daily-date').value=r.date;form.querySelector('#daily-plant').value=r.plant;load();});
     form.querySelectorAll('[data-daily]').forEach(el=>{el.addEventListener('input',refresh);el.addEventListener('change',refresh);});
     form.querySelectorAll('input:not(#daily-date):not(#daily-plant),textarea').forEach(el=>{
       el.addEventListener('input',()=>{state.textContent='Unsaved changes';clearTimeout(debounce);debounce=setTimeout(autosave,800);});
@@ -86,29 +92,37 @@ const Daily = {
     });
     form.addEventListener('submit',async e=>{
       e.preventDefault(); if(!form.reportValidity()) return;
-      const r=collect(); r.draft=false; if(!r.plant || !r.operator) { App.toast('Enter plant and operator names','error');return; }
+      const r=collect(); r.draft=false;
+      if(records.some(x=>x.id!==r.id && x.plant===r.plant && this.stamp(x)===this.stamp(r))) {App.toast('A record already exists at that time','error');return;} if(!r.plant || !r.operator) { App.toast('Enter plant and operator names','error');return; }
       if(r.date>DateEntry.localDate()) { App.toast('Reading date cannot be in the future','error');return; }
       const btn=form.querySelector('#daily-save');btn.disabled=true;
       try { clearTimeout(debounce); await queue; await Store.saveDailyReading(r);records=await Store.getDailyReadings();load();App.toast('Daily readings saved','success'); }
       catch(error){App.toast('Save failed: '+error.message,'error');} finally {btn.disabled=false;}
     });
     container.querySelector('#daily-csv').addEventListener('click',()=>this.exportCSV(records.filter(r=>r.plant===collect().plant)));
+    const draft=records.find(r=>r.draft && Access.canEditDaily(r));
+    if(draft){activeId=draft.id;form.querySelector('#daily-date').value=draft.date;form.querySelector('#daily-plant').value=draft.plant;}
     load();
   },
   summary(record,records) {
     const d=this.calculate(record,records);
     if(!d.previous)return '<p class="form-hint mb-16">First entry sets the baseline. Save the next day to calculate daily energy.</p>';
     const metrics=[['CEB import',d.values.cebImport],['CEB export',d.values.cebExport],['Generator total',d.values.generation],['LT consumption',d.values.lt]];
-    return `<div class="daily-summary"><h3>${d.days===1 ? 'Since yesterday' : `Since previous reading (${d.days} days)`}</h3><p class="form-hint">${Calc.formatDateFull(d.previous.date)} ${Forms.esc(d.previous.time)} → ${Calc.formatDateFull(record.date)} ${Forms.esc(record.time)}. ${d.days>1?'Includes missing days; this is a period total.':'Differences between daily readings; time intervals may vary.'}</p><div class="stat-grid">${metrics.map(([label,value])=>`<div class="stat-card"><div class="stat-value">${Calc.formatNumber(value)}</div><div class="stat-label">${label} kWh</div></div>`).join('')}</div><p class="form-hint">No.1: ${Calc.formatNumber(d.values.gen1)} · No.2: ${Calc.formatNumber(d.values.gen2)} · Transformer: ${Calc.formatNumber(d.values.transformer)} · Net CEB import: ${Calc.formatNumber(d.values.netImport)} kWh</p>${d.warnings.map(w=>`<p class="text-danger">${Forms.esc(w)}</p>`).join('')}</div>`;
+    return `<div class="daily-summary"><h3>${d.days===1 ? '24-hour comparison' : `Since previous record (${Calc.formatNumber(d.days*24)} hours)`}</h3><p class="form-hint">${Calc.formatDateFull(d.previous.date)} ${Forms.esc(d.previous.time)} → ${Calc.formatDateFull(record.date)} ${Forms.esc(record.time)}. ${d.days>1?'Includes missing days; this is a period total.':'Differences between daily readings; time intervals may vary.'}</p><div class="stat-grid">${metrics.map(([label,value])=>`<div class="stat-card"><div class="stat-value">${Calc.formatNumber(value)}</div><div class="stat-label">${label} kWh</div></div>`).join('')}</div><p class="form-hint">No.1: ${Calc.formatNumber(d.values.gen1)} · No.2: ${Calc.formatNumber(d.values.gen2)} · Transformer: ${Calc.formatNumber(d.values.transformer)} · Net CEB import: ${Calc.formatNumber(d.values.netImport)} kWh</p>${d.warnings.map(w=>`<p class="text-danger">${Forms.esc(w)}</p>`).join('')}</div>`;
   },
   history(records) {
-    if(!records.length)return '<p class="form-hint">No daily readings saved for this plant.</p>';
-    return `<div class="table-scroll"><table class="history-table"><thead><tr><th>Date / time</th><th>Operator</th><th>Days</th>${this.channels.map(c=>`<th>${c.label} Δ kWh</th>`).join('')}<th>Status</th></tr></thead><tbody>${records.map(r=>{const d=this.calculate(r,records);return `<tr><td>${Calc.formatDateFull(r.date)} ${Forms.esc(r.time)}</td><td>${Forms.esc(r.operator)}</td><td>${d.days ?? 'Baseline'}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(d.values[c.key])}</td>`).join('')}<td>${r.draft?'Draft — incomplete':d.warnings.length?'Review counters':r._pendingSync?'Saved locally':'Synced'}</td></tr>`;}).join('')}</tbody></table></div><p class="form-hint">Δ = difference from the previous saved date. Select a date above to see or correct its cumulative readings.</p>`;
+    if(!records.length)return '<p class="form-hint">No readings saved for this plant.</p>';
+    records=this.sort(records);
+    const cumulative=`<h4>Cumulative readings</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>Reading time</th>${this.channels.map(c=>`<th>${c.label} kWh</th>`).join('')}<th></th></tr></thead><tbody>${records.map(r=>`<tr><td>${Forms.esc(this.stamp(r).replace('T',' '))}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(r.readings[c.key])}</td>`).join('')}<td>${Access.canEditDaily(r)?`<button type="button" class="btn btn-outline btn-sm" data-load-daily="${Forms.esc(r.id)}">Open / correct</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+    const differences=`<h4>Energy between consecutive records</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>From</th><th>To</th><th>Hours</th>${this.channels.map(c=>`<th>${c.label} Δ kWh</th>`).join('')}<th>Generator total</th><th>Net CEB import</th><th>Status</th></tr></thead><tbody>${records.map(r=>{const d=this.calculate(r,records);return `<tr><td>${d.previous?Forms.esc(this.stamp(d.previous).replace('T',' ')):'Baseline'}</td><td>${Forms.esc(this.stamp(r).replace('T',' '))}</td><td>${Calc.formatNumber(d.days===null?null:d.days*24)}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(d.values[c.key])}</td>`).join('')}<td>${Calc.formatNumber(d.values.generation)}</td><td>${Calc.formatNumber(d.values.netImport)}</td><td>${r.draft?'Draft':d.warnings.length?'Review':r._pendingSync?'Local':'Synced'}</td></tr>`;}).join('')}</tbody></table></div>`;
+    const rates=`<h4>Normalized daily energy (kWh / 24 hours)</h4><p class="form-hint">Rates are interval averages, not measured calendar-day totals.</p><div class="table-scroll"><table class="history-table"><thead><tr><th>Record</th>${this.channels.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${records.map(r=>{const d=this.calculate(r,records);return `<tr><td>${Forms.esc(this.stamp(r))}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(d.days>0 && d.values[c.key]!==null && d.values[c.key]!==undefined ? d.values[c.key]/d.days:null)}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`;
+    const audit=`<h4>Entry trace</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>Reading time</th><th>Operator</th><th>Account / visitor</th><th>Browser device</th><th>Created (UTC)</th><th>Last edited (UTC)</th></tr></thead><tbody>${records.map(r=>`<tr><td>${Forms.esc(this.stamp(r))}</td><td>${Forms.esc(r.operator)}</td><td>${Forms.esc(r.audit?.created?.email || r.audit?.created?.uid || 'Legacy — untracked')}</td><td>${Forms.esc(r.audit?.created?.deviceLabel || '')} ${Forms.esc(r.audit?.created?.deviceId || '')}</td><td>${Forms.esc(r.audit?.created?.clientTime || '')}</td><td>${Forms.esc(r.audit?.lastEdited?.clientTime || '')}</td></tr>`).join('')}</tbody></table></div>`;
+    return cumulative+differences+rates+audit;
   },
   exportCSV(records) {
     const escape=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-    const headers=['Plant','Date','Time','Operator','Entry status','Period days',...this.channels.map(c=>c.label+' cumulative kWh'),...this.channels.map(c=>c.label+' period kWh'),'Generator total kWh','LT consumption kWh','Review notes','Notes'];
-    const rows=records.map(r=>{const d=this.calculate(r,records);return [r.plant,r.date,r.time,r.operator,r.draft?'Draft':'Complete',d.days,...this.channels.map(c=>r.readings[c.key]),...this.channels.map(c=>d.values[c.key]),d.values.generation,d.values.lt,d.warnings.join('; '),r.notes];});
+    const headers=['Plant','Date','Time','Operator','Entry status','Period days',...this.channels.map(c=>c.label+' cumulative kWh'),...this.channels.map(c=>c.label+' period kWh'),'Generator total kWh','LT consumption kWh','Review notes','Notes','Entry UID','Device ID','Device label','Created UTC','Edited UTC'];
+    const rows=records.map(r=>{const d=this.calculate(r,records);return [r.plant,r.date,r.time,r.operator,r.draft?'Draft':'Complete',d.days,...this.channels.map(c=>r.readings[c.key]),...this.channels.map(c=>d.values[c.key]),d.values.generation,d.values.lt,d.warnings.join('; '),r.notes,r.audit?.created?.uid,r.audit?.created?.deviceId,r.audit?.created?.deviceLabel,r.audit?.created?.clientTime,r.audit?.lastEdited?.clientTime];});
     const safe=v=>typeof v==='string' && /^[=+@-]/.test(v) ? "'"+v : v;
     const url=URL.createObjectURL(new Blob(['\ufeff'+[headers,...rows].map(row=>row.map(v=>escape(safe(v))).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='HydroInspect_daily_readings.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);

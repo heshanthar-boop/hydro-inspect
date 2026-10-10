@@ -1,0 +1,32 @@
+// Add these functions and matches INSIDE your existing
+// match /databases/{database}/documents block. Keep existing project rules.
+function hydroOwner() {
+  return request.auth != null && request.auth.token.get('email_verified', false) == true
+    && request.auth.token.get('email', '') == 'heshantha.pcl@gmail.com';
+}
+match /hydro_workspaces/main/hydro_inspections/{id} {
+  allow read: if true;
+  allow create, update, delete: if hydroOwner();
+}
+match /hydro_workspaces/main/hydro_daily_readings/{id} {
+  function validReading() {
+    let d=request.resource.data;
+    return d.id == id && d.plant is string && d.date is string && d.time is string
+      && d.operator is string && d.readings is map && d.draft is bool
+      && d.audit.created.uid is string && d.audit.created.deviceId is string
+      && d.audit.lastEdited.uid == request.auth.uid
+      && d._serverEditedAt == request.time;
+  }
+  allow read: if true;
+  allow create: if request.auth != null && validReading()
+    && request.resource.data.audit.created.uid == request.auth.uid;
+  allow update: if request.auth != null && validReading()
+    && (hydroOwner() || resource.data.audit.created.uid == request.auth.uid)
+    && request.resource.data.audit.created == resource.data.audit.created;
+  allow delete: if hydroOwner();
+}
+
+match /hydro_workspaces/main/config/{id} {
+  allow read: if true;
+  allow write: if hydroOwner();
+}

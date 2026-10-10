@@ -3,8 +3,8 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.6.0',
-  currentPage: 'new-inspection',
+  VERSION: '2.7.0',
+  currentPage: 'records',
   editingInspectionId: null,
 
   async init() {
@@ -12,7 +12,8 @@ const App = {
     await Store.migrateFromLocalStorage();
     await Calc.loadMeterConfig();
     this.bindNavigation();
-    this.navigate('new-inspection');
+    Access.updateUI();
+    this.navigate('records');
     this.registerServiceWorker();
 
     // Reflect real network state immediately, then listen for changes
@@ -23,8 +24,10 @@ const App = {
 
     // Firebase sync — sign-in button in header
     FirebaseSync.renderSignInButton(document.getElementById('header-signin'));
-    FirebaseSync.init(user => {
-      if (user && navigator.onLine) FirebaseSync.syncAll();
+    FirebaseSync.init(async user => {
+      Access.updateUI();
+      if (!Access.isOwner() && ['new-inspection','settings'].includes(this.currentPage)) this.navigate('records');
+      if (user && navigator.onLine) { await FirebaseSync.syncAll(); this.navigate(this.currentPage); }
     });
   },
 
@@ -71,6 +74,7 @@ const App = {
   },
 
   navigate(page) {
+    if(['new-inspection','settings'].includes(page) && !Access.isOwner()) page='records';
     if(MobileEntry.bar) MobileEntry.bar.hidden=true;
     if (this.currentPage === 'new-inspection' && Forms.currentInspection && Forms._saveTimeout) {
       clearTimeout(Forms._saveTimeout); Forms._saveTimeout = null;
@@ -89,6 +93,7 @@ const App = {
     switch (page) {
       case 'new-inspection': this.renderNewInspection(main); break;
       case 'daily': Daily.render(main); break;
+      case 'view-inspection': this.renderNewInspection(main); break;
       case 'records': this.renderRecords(main); break;
       case 'analytics': Analytics.render(main); break;
       case 'settings': this.renderSettings(main); break;
@@ -110,6 +115,7 @@ const App = {
   },
 
   editInspection(id) {
+    if(!Access.isOwner()) {this.editingInspectionId=id;this.navigate('view-inspection');return;}
     this.editingInspectionId = id;
     this.navigate('new-inspection');
   },
@@ -223,11 +229,11 @@ const App = {
         </div>
         ${incidentBadge}
         <div class="record-actions">
-          <button class="btn btn-primary btn-sm" data-edit="${insp.id}">Edit</button>
+          <button class="btn btn-primary btn-sm" data-edit="${insp.id}">${Access.isOwner()?'Edit':'View'}</button>
           <button class="btn btn-outline btn-sm" data-pdf="${insp.id}">Download PDF</button>
           <button class="btn btn-outline btn-sm" data-html="${insp.id}">HTML report</button>
-          <button class="btn btn-outline btn-sm" data-sync="${insp.id}">Sync</button>
-          <button class="btn btn-danger btn-sm" data-delete="${insp.id}">Delete</button>
+          ${Access.isOwner()?`<button class="btn btn-outline btn-sm" data-sync="${insp.id}">Sync</button>`:''}
+          ${Access.isOwner()?`<button class="btn btn-danger btn-sm" data-delete="${insp.id}">Delete</button>`:''}
         </div>
       </div>`;
   },

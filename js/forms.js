@@ -21,6 +21,13 @@ const Forms = {
       : null;
     this.photos = await Store.getPhotosForInspection(inspection.id);
     container.innerHTML = this.renderForm();
+    if(!Access.isOwner()) {
+      container.querySelectorAll('input,select,textarea').forEach(el=>el.disabled=true);
+      container.querySelectorAll('button,input[type=file]').forEach(el=>el.remove());
+      container.querySelectorAll('.card-header[data-toggle]').forEach(header=>header.addEventListener('click',()=>{header.nextElementSibling.classList.toggle('collapsed');header.querySelector('.toggle-icon')?.classList.toggle('collapsed');}));
+      container.insertAdjacentHTML('afterbegin','<div class="daily-save-bar">Read-only inspection</div>');
+      return;
+    }
     this.bindEvents(container);
     this.bindAutoSave(container);
     const headers = [...container.querySelectorAll('.card-header[data-toggle]')];
@@ -1196,6 +1203,7 @@ const Forms = {
   },
 
   async saveDraft() {
+    if(!Access.isOwner()) return;
     const status = document.getElementById('inspection-save-state');
     if (status) status.textContent = 'Saving…';
     try { await Store.saveInspection(this.currentInspection); if (status) status.textContent = 'Saved on this device'; }
