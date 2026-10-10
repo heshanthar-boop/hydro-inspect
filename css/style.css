@@ -702,3 +702,6 @@ input[type=date],input[type=time],input[type=datetime-local] { min-height:44px; 
 @media(max-width:600px) { .main-content { padding-bottom:120px; } input.form-input,textarea.form-textarea,select.form-input,select.form-select { font-size:16px; } .daily-summary .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 #mobile-save-status { color:var(--primary); font-weight:600; }
+
+/* Preserve hidden role controls against flex/grid display rules. */
+[hidden] { display:none !important; }
