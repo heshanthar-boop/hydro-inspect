@@ -44,4 +44,3 @@ match /hydro_workspaces/main/config/{id} {
 
   }
 }
-
