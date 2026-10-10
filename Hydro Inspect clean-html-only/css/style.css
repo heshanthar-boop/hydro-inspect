@@ -656,3 +656,10 @@ a { color: var(--primary-light); text-decoration: none; }
 #analytics-results>.quality-summary { grid-column:1/-1; background:#edf7f6; }
 
 .card-header { color:var(--text); border-bottom:1px solid var(--border); }
+
+.date-entry-tools { display:flex; flex-wrap:wrap; gap:6px; margin:7px 0 4px; }
+.date-entry-btn { border:1px solid #c7dfe0; border-radius:7px; padding:7px 10px; background:#f0f8f8; color:#066267; font-size:12px; font-weight:600; cursor:pointer; min-height:34px; }
+.date-entry-btn:hover { background:#dcefee; }
+.date-entry-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+input[type=date],input[type=time],input[type=datetime-local] { min-height:44px; min-width:0; max-width:100%; font-variant-numeric:tabular-nums; }
+.event-row-add { align-items:flex-start; }

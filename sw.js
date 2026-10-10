@@ -1,5 +1,5 @@
-const CACHE_NAME = 'hydroinspect-v6';
-const APP_VERSION = '2.2.0';
+const CACHE_NAME = 'hydroinspect-v7';
+const APP_VERSION = '2.3.0';
 
 // Use relative paths so it works on GitHub Pages subpath
 const LOCAL_ASSETS = [
@@ -15,6 +15,7 @@ const LOCAL_ASSETS = [
   './js/relay489.js',
   './js/firebase-sync.js',
   './js/app.js',
+  './js/date-entry.js',
   './icons/icon.svg',
   './manifest.json',
 ];

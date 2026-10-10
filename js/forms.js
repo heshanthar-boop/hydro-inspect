@@ -11,6 +11,8 @@ const Forms = {
 
   // Initialize a new or existing inspection form
   async init(inspection, container) {
+    clearTimeout(this._saveTimeout);
+    this._saveTimeout = null;
     this.currentInspection = inspection;
     await Calc.loadMeterConfig();
     this.previousInspection = await Store.getPreviousInspection(inspection.general.date, inspection.general.plantName);
@@ -76,7 +78,7 @@ const Forms = {
             <span class="toggle-slider"></span>
             Backfill past visit
           </label>
-          <span class="form-hint" id="backfill-hint">${s.backfill ? 'Entering historical data — date is editable' : 'Live inspection — date auto-set to today'}</span>
+          <span class="form-hint" id="backfill-hint">${s.backfill ? 'Entering historical data — date is editable' : 'Choose today or an earlier visit date'}</span>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -111,7 +113,7 @@ const Forms = {
 
   renderGeneralInfo(insp) {
     const s = insp.session || {};
-    const dateReadonly = !s.backfill ? 'readonly' : '';
+    const dateReadonly = '';
     return `
     <div class="card">
       <div class="card-header" data-toggle="general">
@@ -915,6 +917,14 @@ const Forms = {
   // ===== Event Binding =====
 
   bindEvents(container) {
+    container.querySelector('[data-field="general.date"]')?.addEventListener('change', e => {
+      this.currentInspection.general.date = e.target.value;
+      const backfill = e.target.value !== DateEntry.localDate();
+      this.currentInspection.session.backfill = backfill;
+      container.querySelector('#backfill-toggle').checked = backfill;
+      container.querySelector('#backfill-hint').textContent = backfill ? 'Historical visit date selected' : 'Today’s inspection';
+      this.saveAndRefresh(container).catch(error => App.toast('Unable to update date: ' + error.message, 'error'));
+    });
     // Toggle sections
     container.querySelectorAll('.card-header[data-toggle]').forEach(header => {
       header.addEventListener('click', () => {
