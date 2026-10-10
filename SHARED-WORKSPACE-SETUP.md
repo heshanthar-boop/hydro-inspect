@@ -1,8 +1,13 @@
 # Shared access setup
 
+Backend activated on 11 October 2026 (Asia/Colombo). Anonymous Authentication is enabled; shared-workspace rules are deployed alongside the existing sites/users rules. Project billing is disabled.
+
+Live checks passed using two temporary visitor sessions: shared reads allowed, visitor inspection writes denied, edits of another visitor’s reading denied, creator corrections allowed and server timestamps assigned. Temporary test records/accounts were removed.
+
+
 Owner: heshantha.pcl@gmail.com (verified Google sign-in). Everyone can read shared inspections and analytics. Visitors receive anonymous Firebase identities and can submit meter readings with a chosen operator name. Visitors may correct their own records; only the owner may correct other records or change inspections.
 
-Before publishing this upgrade:
+Configuration reference (already applied):
 
 1. In the Firebase project solarpv-field-tool, enable Authentication > Sign-in method > Anonymous. Keep Google enabled.
 2. Open Firestore Database > Rules. Copy the existing deployed rules first. Add firestore-shared.rules.fragment inside the existing database documents match; keep the rules used by other applications in this project. Ensure no broad allow-write rule also matches the hydro_workspaces path (Firestore combines matching allow rules). Publish the merged rules.

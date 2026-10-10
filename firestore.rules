@@ -1,24 +1,47 @@
-// Firestore Security Rules for HydroInspect
-// Paste into Firebase Console → Firestore Database → Rules, then Publish.
-//
-// These rules ensure each signed-in user can only read/write their own data.
-// The Firebase API key in firebase-sync.js is NOT a secret — it identifies
-// your project — but these rules are what actually prevent strangers from
-// reading or writing to your database.
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Per-user workspace: /users/{uid}/...
+    match /sites/{siteId}/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if request.auth.uid == uid;
     }
 
-    // Deny everything else by default
-    match /{document=**} {
-      allow read, write: if false;
-    }
+// Add these functions and matches INSIDE your existing
+// match /databases/{database}/documents block. Keep existing project rules.
+function hydroOwner() {
+  return request.auth != null && request.auth.token.get('email_verified', false) == true
+    && request.auth.token.get('email', '') == 'heshantha.pcl@gmail.com';
+}
+match /hydro_workspaces/main/hydro_inspections/{id} {
+  allow read: if true;
+  allow create, update, delete: if hydroOwner();
+}
+match /hydro_workspaces/main/hydro_daily_readings/{id} {
+  function validReading() {
+    let d=request.resource.data;
+    return d.id == id && d.plant is string && d.date is string && d.time is string
+      && d.operator is string && d.readings is map && d.draft is bool
+      && d.audit.created.uid is string && d.audit.created.deviceId is string
+      && d.audit.lastEdited.uid == request.auth.uid
+      && d._serverEditedAt == request.time;
+  }
+  allow read: if true;
+  allow create: if request.auth != null && validReading()
+    && request.resource.data.audit.created.uid == request.auth.uid;
+  allow update: if request.auth != null && validReading()
+    && (hydroOwner() || resource.data.audit.created.uid == request.auth.uid)
+    && request.resource.data.audit.created == resource.data.audit.created;
+  allow delete: if hydroOwner();
+}
+
+match /hydro_workspaces/main/config/{id} {
+  allow read: if true;
+  allow write: if hydroOwner();
+}
+
   }
 }
+
