@@ -97,11 +97,12 @@ const Store = {
     return new Promise((resolve, reject) => {
       const tx = db.transaction('inspections', 'readwrite');
       const req = tx.objectStore('inspections').put(inspection);
-      req.onsuccess = () => {
+      tx.oncomplete = () => {
         if (!silent && typeof FirebaseSync !== 'undefined') FirebaseSync.onInspectionSaved(inspection);
         resolve(inspection);
       };
-      req.onerror = () => reject(req.error);
+      tx.onabort = () => reject(tx.error || new Error("Inspection save failed"));
+      tx.onerror = () => reject(tx.error);
     });
   },
 
@@ -137,10 +138,10 @@ const Store = {
     });
   },
 
-  async getPreviousInspection(currentDate) {
+  async getPreviousInspection(currentDate, plantName) {
     const all = await this.getInspections();
     const current = new Date(currentDate);
-    return all.find(i => new Date(i.general.date) < current) || null;
+    return all.find(i => new Date(i.general.date) < current && (!plantName || i.general.plantName === plantName)) || null;
   },
 
   // ===== Photo CRUD =====

@@ -3,7 +3,29 @@
  * generatePDF now accepts photos array from IndexedDB.
  */
 const Reports = {
+  async downloadHTML(inspection) {
+    if (!inspection) return;
+    await Calc.loadMeterConfig();
+    const previous = await Store.getPreviousInspection(inspection.general.date, inspection.general.plantName);
+    const diffs = previous ? Calc.calculateKWhDiffs(inspection, previous) : null;
+    const esc = value => Forms.esc(String(value ?? ''));
+    const title = key => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+    const render = value => {
+      if (Array.isArray(value)) return value.length ? value.map(item => `<div class="item">${render(item)}</div>`).join('') : '<p>No entries recorded</p>';
+      if (value && typeof value === 'object') return `<table>${Object.entries(value).filter(([key]) => !key.startsWith('_') && !['id','photoIds'].includes(key)).map(([key,v]) => `<tr><th>${esc(title(key))}</th><td>${render(v)}</td></tr>`).join('')}</table>`;
+      return esc(value === '' || value == null ? 'Not recorded' : value);
+    };
+    const photos = await Store.getPhotosForInspection(inspection.id);
+    const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inspection report</title><style>body{font:14px system-ui;color:#18323c;max-width:1000px;margin:40px auto;padding:20px}h1{color:#087f83}h2{border-bottom:2px solid #087f83;padding:12px 0}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;vertical-align:top;border-bottom:1px solid #e2e8f0}th{width:32%}.item{margin:12px 0}img{max-width:45%;max-height:350px;object-fit:contain;margin:10px}button{padding:12px;background:#087f83;color:white;border:0;border-radius:8px}@media print{button{display:none}body{margin:0}tr,img{break-inside:avoid}}</style><button onclick="window.print()">Print / Save as PDF</button><h1>${esc(inspection.general.plantName)}</h1><p>Inspection report · ${esc(inspection.general.date)} · ${esc(inspection.general.inspectorName)}</p>${diffs ? `<h2>Comparison with ${esc(previous.general.date)}</h2>${render(diffs)}` : '<p>No earlier inspection for this plant; period comparisons unavailable.</p>'}${Object.entries(inspection).filter(([key]) => !key.startsWith('_') && !['id','createdAt','updatedAt'].includes(key)).map(([key,value]) => `<section><h2>${esc(title(key))}</h2>${render(value)}</section>`).join('')}<h2>Inspection photos</h2>${photos.filter(p => /^data:image\/(jpeg|png|webp);base64,/.test(p.dataUrl)).map(p => `<figure><img src="${esc(p.dataUrl)}" alt="Inspection photo"><figcaption>${esc(p.caption || '')}</figcaption></figure>`).join('') || '<p>No photos recorded</p>'}</html>`;
+    const url = URL.createObjectURL(new Blob([html], {type:'text/html;charset=utf-8'}));
+    const link = document.createElement('a'); link.href = url; link.download = `Inspection_${inspection.general.date}.html`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    App.toast('Inspection report downloaded', 'success');
+  },
+
+
   async generatePDF(inspection, photos) {
+    if (!window.jspdf?.jsPDF) throw new Error('PDF library unavailable. Reconnect or download the HTML report.');
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -11,7 +33,7 @@ const Reports = {
     const contentWidth = pageWidth - margin * 2;
     let y = 15;
     await Calc.loadMeterConfig();
-    const prev = await Store.getPreviousInspection(inspection.general.date);
+    const prev = await Store.getPreviousInspection(inspection.general.date, inspection.general.plantName);
     const diffs = prev ? Calc.calculateKWhDiffs(inspection, prev) : null;
     const settings = await Store.getSettings();
     photos = photos || [];
@@ -51,7 +73,7 @@ const Reports = {
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'bold');
       const val = (value !== undefined && value !== '' && value !== null)
-        ? `${Calc.formatNumber(value)} ${unit}`.trim() : '-';
+        ? `${Calc._num(value) !== null ? Calc.formatNumber(value) : String(value)} ${unit}`.trim() : '-';
       doc.text(val, margin + 75, y);
       y += 5;
     };
@@ -84,8 +106,8 @@ const Reports = {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       const lines = doc.splitTextToSize(String(text), contentWidth - 4);
-      doc.text(lines, margin + 2, y);
-      y += lines.length * 4 + 2;
+      for (const line of lines) { checkPage(6); doc.text(line, margin + 2, y); y += 4; }
+      y += 2;
     };
 
     const addNote = (text) => {
@@ -107,7 +129,7 @@ const Reports = {
       doc.setFontSize(8.5);
       doc.setTextColor(220, 38, 38);
       doc.text('! ' + label + ':', margin + 2, y);
-      doc.text(`${Calc.formatNumber(value)} ${unit}`.trim(), margin + 75, y);
+      doc.text(`${Calc._num(value) !== null ? Calc.formatNumber(value) : String(value)} ${unit}`.trim(), margin + 75, y);
       doc.setTextColor(0, 0, 0);
       y += 5;
     };
@@ -116,7 +138,7 @@ const Reports = {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(30, 64, 175);
-    doc.text('Monthly Mini Hydro Plant', pageWidth / 2, y, { align: 'center' });
+    doc.text('Mini Hydro Plant', pageWidth / 2, y, { align: 'center' });
     y += 6;
     doc.text('Electrical and Electronic Inspection Report', pageWidth / 2, y, { align: 'center' });
     y += 8;
@@ -420,6 +442,10 @@ const Reports = {
 
     const dateStr = inspection.general.date.replace(/-/g, '');
     const filename = `Inspection_Report_${dateStr}_${inspection.general.plantName.replace(/\s+/g,'_').substring(0,20)}.pdf`;
+    for (let page = 1; page <= doc.getNumberOfPages(); page++) {
+      doc.setPage(page); doc.setFontSize(8); doc.setTextColor(100,100,100);
+      doc.text(`HydroInspect | ${inspection.general.date} | Page ${page} of ${doc.getNumberOfPages()}`, margin, 289);
+    }
     doc.save(filename);
     App.toast('PDF report generated!', 'success');
   },

@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.1.0',
+  VERSION: '2.2.0',
   currentPage: 'new-inspection',
   editingInspectionId: null,
 
@@ -71,6 +71,11 @@ const App = {
   },
 
   navigate(page) {
+    if (this.currentPage === 'new-inspection' && Forms.currentInspection && Forms._saveTimeout) {
+      clearTimeout(Forms._saveTimeout); Forms._saveTimeout = null;
+      Forms.collectFormData(document.getElementById('main-content')); Forms.saveDraft();
+    }
+    if (this.currentPage === 'analytics' && page !== 'analytics') Analytics.destroyCharts();
     this.currentPage = page;
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
     document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
@@ -123,6 +128,7 @@ const App = {
     }
 
     container.innerHTML = `
+      <div class="page-intro"><span class="eyebrow">INSPECTION LIBRARY</span><h1>Inspection history</h1><p>Review readings, track changes, and download inspection reports.</p></div>
       <div class="search-bar">
         <input type="text" class="form-input" id="search-records" placeholder="Search by date, plant name...">
       </div>
@@ -146,7 +152,7 @@ const App = {
         i.general.plantName.toLowerCase().includes(q) ||
         i.general.inspectorName.toLowerCase().includes(q)
       );
-      list.innerHTML = filtered.map(insp => this.renderRecordCard(insp, inspections)).join('');
+      list.innerHTML = filtered.map(insp => this.renderRecordCard(insp, inspections)).join('') || '<div class="empty-state">No inspections match your search.</div>';
       this.bindRecordActions(container);
     });
 
@@ -168,8 +174,7 @@ const App = {
 
   renderRecordCard(insp, allInspections) {
     const date = Calc.formatDateFull(insp.general.date);
-    const idx = allInspections.indexOf(insp);
-    const prev = idx < allInspections.length - 1 ? allInspections[idx + 1] : null;
+    const prev = allInspections.find(i => i.general.plantName === insp.general.plantName && i.general.date < insp.general.date) || null;
     const diffs = prev ? Calc.calculateKWhDiffs(insp, prev) : null;
     const importDiff = diffs?.ceb?.importedTotal;
     const gen1Events = (insp.relayEvents.gen1Events || []).length;
@@ -202,7 +207,7 @@ const App = {
           </div>
           <div class="record-stat">
             <span class="record-stat-label">33kV Trips</span>
-            <span class="record-stat-value">${insp.switchgear.outdoorBreakerTripCount || '-'}</span>
+            <span class="record-stat-value">${Calc.formatNumber(insp.switchgear.outdoorBreakerTripCount)}</span>
           </div>
           <div class="record-stat">
             <span class="record-stat-label">Gen1 Hrs</span>
@@ -210,13 +215,14 @@ const App = {
           </div>
           <div class="record-stat">
             <span class="record-stat-label">Relay Events</span>
-            <span class="record-stat-value">${gen1Events + gen2Events}</span>
+            <span class="record-stat-value">${gen1Events + gen2Events + (insp.relayEvents.transformerEvents || []).length}</span>
           </div>
         </div>
         ${incidentBadge}
         <div class="record-actions">
           <button class="btn btn-primary btn-sm" data-edit="${insp.id}">Edit</button>
-          <button class="btn btn-outline btn-sm" data-pdf="${insp.id}">PDF</button>
+          <button class="btn btn-outline btn-sm" data-pdf="${insp.id}">Download PDF</button>
+          <button class="btn btn-outline btn-sm" data-html="${insp.id}">HTML report</button>
           <button class="btn btn-outline btn-sm" data-sync="${insp.id}">Sync</button>
           <button class="btn btn-danger btn-sm" data-delete="${insp.id}">Delete</button>
         </div>
@@ -224,6 +230,7 @@ const App = {
   },
 
   bindRecordActions(container) {
+    container.querySelectorAll('[data-html]').forEach(btn => btn.addEventListener('click', async () => Reports.downloadHTML(await Store.getInspection(btn.dataset.html))));
     container.querySelectorAll('[data-edit]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.editInspection(btn.dataset.edit); });
     });
@@ -233,7 +240,10 @@ const App = {
         const insp = await Store.getInspection(btn.dataset.pdf);
         if (insp) {
           const photos = await Store.getPhotosForInspection(insp.id);
-          Reports.generatePDF(insp, photos);
+          btn.disabled = true;
+          try { await Reports.generatePDF(insp, photos); }
+          catch (error) { this.toast('Report failed: ' + error.message, 'error'); }
+          finally { btn.disabled = false; }
         }
       });
     });
