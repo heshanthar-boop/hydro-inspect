@@ -424,12 +424,12 @@ const Forms = {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Gen 1 CB Trip Count ${Calc.diffBadgeHTML(gen1TripDiff, 'trips')}</label>
-            <input type="number" class="form-input" data-field="switchgear.gen1BreakerTripCount" value="${insp.switchgear.gen1BreakerTripCount || ''}">
+            <input type="number" class="form-input" data-field="switchgear.gen1BreakerTripCount" value="${insp.switchgear.gen1BreakerTripCount ?? ''}">
             ${tripAlert(gen1TripDiff)}
           </div>
           <div class="form-group">
             <label class="form-label">Gen 2 CB Trip Count ${Calc.diffBadgeHTML(gen2TripDiff, 'trips')}</label>
-            <input type="number" class="form-input" data-field="switchgear.gen2BreakerTripCount" value="${insp.switchgear.gen2BreakerTripCount || ''}">
+            <input type="number" class="form-input" data-field="switchgear.gen2BreakerTripCount" value="${insp.switchgear.gen2BreakerTripCount ?? ''}">
             ${tripAlert(gen2TripDiff)}
           </div>
         </div>
@@ -557,11 +557,11 @@ const Forms = {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Initial Running Hour</label>
-              <div class="input-with-unit"><input type="number" class="form-input" data-field="generators.${key}.initialRunningHour" value="${gen.initialRunningHour || ''}" step="1"><span class="input-unit">hrs</span></div>
+              <div class="input-with-unit"><input type="number" class="form-input" data-field="generators.${key}.initialRunningHour" value="${gen.initialRunningHour ?? ''}" step="1"><span class="input-unit">hrs</span></div>
             </div>
             <div class="form-group">
               <label class="form-label">Alarm Limit (override)</label>
-              <div class="input-with-unit"><input type="number" class="form-input" data-field="generators.${key}.runningHourAlarmLimit" value="${gen.runningHourAlarmLimit || ''}" step="1"><span class="input-unit">hrs</span></div>
+              <div class="input-with-unit"><input type="number" class="form-input" data-field="generators.${key}.runningHourAlarmLimit" value="${gen.runningHourAlarmLimit ?? ''}" step="1"><span class="input-unit">hrs</span></div>
             </div>
           </div>
           ${remaining !== null ? `<div class="hours-remaining ${remainingClass}">Hours to alarm limit: <strong>${Calc.formatNumber(remaining)} hrs</strong></div>` : ''}

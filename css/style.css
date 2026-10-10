@@ -663,3 +663,24 @@ a { color: var(--primary-light); text-decoration: none; }
 .date-entry-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 input[type=date],input[type=time],input[type=datetime-local] { min-height:44px; min-width:0; max-width:100%; font-variant-numeric:tabular-nums; }
 .event-row-add { align-items:flex-start; }
+
+.number-entry-tools { display:flex; gap:6px; margin-top:7px; }
+.number-entry-btn { min-height:34px; padding:5px 12px; border:1px solid #c7dfe0; border-radius:7px; background:#f0f8f8; color:#066267; font-size:13px; font-weight:600; cursor:pointer; }
+.number-entry-btn:last-child { margin-left:auto; }
+.number-entry-dialog { width:min(420px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; margin:auto; border:1px solid var(--border); border-radius:20px; padding:22px; color:var(--text); box-shadow:0 20px 70px #12353f44; }
+.number-entry-dialog::backdrop { background:#12353f88; }
+.number-entry-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.number-entry-heading h2 { font-size:18px; }
+.number-entry-heading button { background:none; border:0; font-size:28px; padding:4px 10px; cursor:pointer; }
+#number-entry-previous { color:var(--text-secondary); font-size:13px; margin-top:6px; }
+#number-entry-value { display:block; font-size:32px; font-variant-numeric:tabular-nums; background:#edf7f6; border-radius:12px; padding:15px; margin-top:14px; overflow-wrap:anywhere; }
+#number-entry-error { color:#b91c1c; font-size:13px; min-height:22px; margin:8px 0; }
+.number-key-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.number-key-grid button { min-height:52px; border:1px solid var(--border); background:#f5f8fa; border-radius:10px; font-size:22px; cursor:pointer; }
+.number-key-grid button[data-key=clear],.number-key-grid button[data-key=back] { font-size:16px; }
+.number-key-grid button[data-key=back] { grid-column:span 2; }
+.number-entry-actions { display:flex; gap:10px; margin-top:14px; }
+.number-entry-actions button { flex:1; min-height:46px; border:1px solid var(--primary); border-radius:10px; background:#fff; color:var(--primary); cursor:pointer; font-weight:700; }
+.number-entry-actions button[data-done] { background:var(--primary); color:#fff; }
+.number-entry-hint { color:var(--text-secondary); font-size:11px; margin-top:12px; }
+.number-entry-dialog button:focus-visible,.number-entry-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
