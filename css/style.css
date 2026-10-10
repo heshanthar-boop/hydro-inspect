@@ -684,3 +684,8 @@ input[type=date],input[type=time],input[type=datetime-local] { min-height:44px; 
 .number-entry-actions button[data-done] { background:var(--primary); color:#fff; }
 .number-entry-hint { color:var(--text-secondary); font-size:11px; margin-top:12px; }
 .number-entry-dialog button:focus-visible,.number-entry-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+
+.daily-meter-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.daily-summary { background:#edf7f6;padding:18px;border-radius:12px;margin:16px 0; }
+.bottom-nav-item { padding-left:8px;padding-right:8px; }
+@media(max-width:500px) { .daily-meter-grid { grid-template-columns:1fr; } }

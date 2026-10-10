@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.4.0',
+  VERSION: '2.5.0',
   currentPage: 'new-inspection',
   editingInspectionId: null,
 
@@ -86,6 +86,7 @@ const App = {
 
     switch (page) {
       case 'new-inspection': this.renderNewInspection(main); break;
+      case 'daily': Daily.render(main); break;
       case 'records': this.renderRecords(main); break;
       case 'analytics': Analytics.render(main); break;
       case 'settings': this.renderSettings(main); break;

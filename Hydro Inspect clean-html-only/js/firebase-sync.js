@@ -320,6 +320,7 @@ const FirebaseSync = (() => {
         }
       }
 
+      await syncDailyReadings();
       _setSyncBadge('cloud');
       const parts = [];
       if (pushed)    parts.push(`${pushed} pushed`);
@@ -348,7 +349,32 @@ const FirebaseSync = (() => {
     });
   }
 
+  async function syncDailyReadings() {
+    if(!isSignedIn() || !navigator.onLine) return;
+    const col=_userCol('hydro_daily_readings');
+    const snapshot=await col.get();
+    const remote=new Map(snapshot.docs.map(d=>[d.id,d.data()]));
+    const local=await Store.getDailyReadings();
+    const seen=new Set();
+    for(const record of local) {
+      seen.add(record.id); const r=remote.get(record.id);
+      if(!r || _newerSide(record,r)==='local') {
+        await col.doc(record.id).set({...record,_pendingSync:false});
+        await Store.saveDailyReading({...record,_pendingSync:false},{silent:true});
+      } else if(_newerSide(record,r)==='remote' || record._pendingSync) await Store.saveDailyReading({...r,_pendingSync:false},{silent:true});
+    }
+    for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_pendingSync:false},{silent:true});
+  }
+
+  function onDailyReadingSaved(record) {
+    if(!isSignedIn() || !navigator.onLine) return;
+    // Full reconciliation prevents overwriting a newer cloud edit.
+    syncDailyReadings().catch(error=>{console.warn('Daily sync failed',error); App.toast('Daily reading saved locally; cloud sync needs retry','warning');});
+  }
+
   return {
+    syncDailyReadings,
+    onDailyReadingSaved,
     init,
     signIn,
     signOut,

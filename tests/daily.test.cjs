@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const vm=require('node:vm');
+const ctx=vm.createContext({console});
+vm.runInContext(fs.readFileSync('js/calculations.js','utf8')+'\n'+fs.readFileSync('js/daily.js','utf8')+'\nglobalThis.Daily=Daily;globalThis.Calc=Calc;',ctx);
+ctx.Calc.meterChanges=[];
+const a={plant:'A',date:'2026-10-08',readings:{cebImport:'100',cebExport:'20',gen1:'100',gen2:'200',transformer:'250',lt:'10'}};
+const b={plant:'A',date:'2026-10-09',readings:{cebImport:'130',cebExport:'25',gen1:'115',gen2:'220',transformer:'280',lt:'12'}};
+const d=ctx.Daily.calculate(b,[a]);assert.equal(d.values.cebImport,30);assert.equal(d.values.cebExport,5);assert.equal(d.values.generation,35);assert.equal(d.values.lt,2);assert.equal(d.values.netImport,25);
+assert.equal(ctx.Daily.calculate({...b,date:'2026-10-10'},[a]).days,2);
+assert.equal(ctx.Daily.calculate(b,[{...a,plant:'B'}]).previous,null);
+assert.equal(ctx.Daily.calculate({...b,readings:a.readings},[a]).values.cebImport,0);
+const reset=ctx.Daily.calculate({...b,readings:{...b.readings,cebImport:'1'}},[a]);assert.equal(reset.values.cebImport,null);assert.equal(reset.warnings.length,1);
+ctx.Calc.meterChanges=[{channel:'gen1Panel',date:'2026-10-08',oldFinal:'110',newStart:'0'}];
+assert.equal(ctx.Daily.calculate({...b,readings:{...b.readings,gen1:'5'}},[a]).values.gen1,15);
+ctx.Calc.meterChanges[0].oldFinal='';assert.equal(ctx.Daily.calculate(b,[a]).values.gen1,null);
+console.log('Daily calculation regression checks passed');
