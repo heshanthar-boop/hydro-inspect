@@ -13,4 +13,5 @@ const reset=ctx.Daily.calculate({...b,readings:{...b.readings,cebImport:'1'}},[a
 ctx.Calc.meterChanges=[{channel:'gen1Panel',date:'2026-10-08',oldFinal:'110',newStart:'0'}];
 assert.equal(ctx.Daily.calculate({...b,readings:{...b.readings,gen1:'5'}},[a]).values.gen1,15);
 ctx.Calc.meterChanges[0].oldFinal='';assert.equal(ctx.Daily.calculate(b,[a]).values.gen1,null);
+assert.equal(ctx.Daily.calculate(b,[{...a,draft:true}]).previous,null);
 console.log('Daily calculation regression checks passed');

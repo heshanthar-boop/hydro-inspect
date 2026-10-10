@@ -1179,17 +1179,19 @@ const Forms = {
     });
   },
 
-  // Auto-save on field change with debounce
+  // Save while typing and flush immediately when leaving a field.
   bindAutoSave(container) {
-    container.querySelectorAll('[data-field]').forEach(input => {
-      input.addEventListener('change', () => {
-        clearTimeout(this._saveTimeout);
-        this._saveTimeout = setTimeout(() => {
-          this._saveTimeout = null;
-          this.collectFormData(container);
-          this.saveDraft();
-        }, 600);
-      });
+    const flush=()=>{
+      clearTimeout(this._saveTimeout);this._saveTimeout=null;
+      const invalid=[...container.querySelectorAll('input[type=number]')].find(el=>el.validity.badInput || el.validity.stepMismatch || el.validity.rangeUnderflow || el.validity.rangeOverflow);
+      if(invalid){invalid.setAttribute('aria-invalid','true');const status=document.getElementById('inspection-save-state');if(status)status.textContent='Check the highlighted reading — changes not saved';return;}
+      container.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
+      this.collectFormData(container);return this.saveDraft();
+    };
+    this.flush=flush;
+    container.querySelectorAll('[data-field]').forEach(input=>{
+      input.addEventListener('input',()=>{clearTimeout(this._saveTimeout);const status=document.getElementById('inspection-save-state');if(status)status.textContent='Unsaved changes';this._saveTimeout=setTimeout(flush,800);});
+      input.addEventListener('change',flush);
     });
   },
 

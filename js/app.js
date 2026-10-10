@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.5.0',
+  VERSION: '2.6.0',
   currentPage: 'new-inspection',
   editingInspectionId: null,
 
@@ -71,10 +71,12 @@ const App = {
   },
 
   navigate(page) {
+    if(MobileEntry.bar) MobileEntry.bar.hidden=true;
     if (this.currentPage === 'new-inspection' && Forms.currentInspection && Forms._saveTimeout) {
       clearTimeout(Forms._saveTimeout); Forms._saveTimeout = null;
-      Forms.collectFormData(document.getElementById('main-content')); Forms.saveDraft();
+      Forms.flush?.();
     }
+    if (this.currentPage === 'daily') Daily.flush?.();
     if (this.currentPage === 'analytics' && page !== 'analytics') Analytics.destroyCharts();
     this.currentPage = page;
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
