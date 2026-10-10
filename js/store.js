@@ -386,7 +386,7 @@ const Store = {
 
       general: {
         plantName: settings.plantName,
-        date: now.toISOString().split('T')[0],
+        date: DateEntry.localDate(now),
         inspectorName: settings.inspectorName,
         plantLocation: settings.plantLocation,
         weatherConditions: '',
