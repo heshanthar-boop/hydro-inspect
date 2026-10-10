@@ -5,3 +5,6 @@ build/
 .cache/
 *.log
 npm-debug.log*
+
+output/
+node_modules/

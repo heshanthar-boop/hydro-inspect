@@ -5,15 +5,48 @@
 const Analytics = {
   charts: [],
 
+  async render(container) {
+    this.destroyCharts();
+    await Calc.loadMeterConfig();
+    const all = await Store.getInspections();
+    const plants = [...new Set(all.map(i => i.general.plantName))].sort();
+    container.innerHTML = `<div class="page-intro"><span class="eyebrow">OPERATIONS INTELLIGENCE</span><h1>Performance & history</h1><p>Explore energy, equipment readings, and events across inspection periods.</p></div>
+      <div class="analytics-filters"><label>Plant<select class="form-input" id="analytics-plant">${plants.map(p => `<option>${Forms.esc(p)}</option>`).join('')}</select></label>
+      <label>From<input class="form-input" type="date" id="analytics-from"></label><label>To<input class="form-input" type="date" id="analytics-to"></label>
+      <button class="btn btn-outline" id="analytics-reset">Reset dates</button></div><p class="form-hint">Energy is the difference between recorded visits, not a calendar-month total. Decreasing counters require review and are excluded from energy charts.</p><div id="analytics-results"></div>`;
+    const update = () => {
+      const plant = container.querySelector('#analytics-plant').value;
+      const from = container.querySelector('#analytics-from').value;
+      const to = container.querySelector('#analytics-to').value;
+      const target = container.querySelector('#analytics-results');
+      if (from && to && from > to) { this.destroyCharts(); target.innerHTML = '<div class="empty-state">Start date must be before end date.</div>'; return; }
+      this.renderData(target, all.filter(i => i.general.plantName === plant && (!from || i.general.date >= from) && (!to || i.general.date <= to)));
+    };
+    container.querySelectorAll('select,input').forEach(el => el.addEventListener('change', update));
+    container.querySelector('#analytics-reset').addEventListener('click', () => { container.querySelectorAll('input').forEach(el => el.value = ''); update(); });
+    await update();
+  },
+
+  periodTable(inspections) {
+    const sorted = [...inspections].sort((a,b) => a.general.date.localeCompare(b.general.date));
+    const rows = sorted.slice(1).map((curr, index) => {
+      const d = Calc.calculateKWhDiffs(curr, sorted[index]);
+      const energy = d.ceb.importedTotal;
+      return `<tr><td>${Calc.formatDateFull(curr.general.date)}</td><td>${d.daysBetween}</td><td>${Calc.formatNumber(energy)}${energy < 0 ? ' (review counter)' : ''}</td><td>${Calc.formatNumber(Calc.dailyAverage(energy,d.daysBetween))}</td><td>${Calc.formatNumber(d.generators.gen1Hours)}</td><td>${Calc.formatNumber(d.generators.gen2Hours)}</td><td>${Calc.formatNumber(d.switchgear.tripCount)}</td></tr>`;
+    });
+    return `<div class="chart-container"><h3>Period comparison</h3><p class="form-hint">A dash means unavailable. Negative counter changes may indicate a reset or incorrect entry.</p><div class="table-scroll"><table class="history-table"><thead><tr><th>Visit</th><th>Days</th><th>CEB import kWh</th><th>kWh/day</th><th>Gen 1 hours</th><th>Gen 2 hours</th><th>New trips</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`;
+  },
+
+
+
   destroyCharts() {
     this.charts.forEach(c => c.destroy());
     this.charts = [];
   },
 
-  async render(container) {
+  async renderData(container, inspections) {
     this.destroyCharts();
-    await Calc.loadMeterConfig();
-    const inspections = await Store.getInspections();
+
 
     if (inspections.length < 2) {
       container.innerHTML = `
@@ -34,12 +67,17 @@ const Analytics = {
 
     container.innerHTML = `
       ${this.renderSummaryStats(latest, diffs, inspections)}
+      <div class="chart-container quality-summary"><h3>Latest inspection overview</h3>
+        <p><strong>${Forms.esc(latest.general.plantName)}</strong> · ${Calc.formatDateFull(latest.general.date)}</p>
+        <p>${(latest.incidents || []).length} incident(s) · ${(latest.followUpActions || []).length} follow-up action(s) · ${(latest.observations?.items || []).length} observation(s)</p>
+        <p class="form-hint">${diffs.ceb.importedTotal < 0 ? 'Review required: the CEB import counter decreased. Check the reading or record a meter reset before using the period total.' : 'Compare changes below with the previous visit. Missing readings appear as gaps.'}</p>
+      </div>
       <div class="chart-container">
-        <h3>Monthly Generation (CEB Import kWh)</h3>
+        <h3>Inspection-period energy (CEB import kWh)</h3>
         <canvas id="chart-monthly-gen"></canvas>
       </div>
       <div class="chart-container">
-        <h3>Daily Average Generation</h3>
+        <h3>Average daily energy per inspection period</h3>
         <canvas id="chart-daily-avg"></canvas>
       </div>
       <div class="chart-container">
@@ -76,6 +114,8 @@ const Analytics = {
       </div>
     `;
 
+    container.insertAdjacentHTML('beforeend', this.periodTable(inspections));
+    if (typeof Chart === 'undefined') { container.querySelectorAll('.chart-container').forEach(el => el.innerHTML += '<p class="form-hint">Charts require the chart library. Reconnect and reload; the table remains available.</p>'); return; }
     this.renderMonthlyGenChart(monthly);
     this.renderDailyAvgChart(monthly);
     this.renderGenHoursChart(inspections);
@@ -91,13 +131,13 @@ const Analytics = {
   renderSummaryStats(latest, diffs, inspections) {
     const totalInspections = inspections.length;
     const monthlyGen = diffs?.ceb?.importedTotal;
-    const dailyAvg = diffs && diffs.daysBetween > 0 ? Math.round(monthlyGen / diffs.daysBetween) : null;
+    const dailyAvg = diffs ? Calc.dailyAverage(monthlyGen, diffs.daysBetween) : null;
     const totalTrips = latest.switchgear.outdoorBreakerTripCount;
     const newTrips = diffs?.switchgear?.tripCount;
     const gen1Hours = latest.generators.gen1.runningHoursOnline;
     const gen2Hours = latest.generators.gen2.runningHoursOnline;
     const gen1Limit = parseFloat(latest.generators.gen1.runningHourAlarmLimit) || parseFloat(latest.generators.gen1.runningHourLimit);
-    const gen1Remaining = (gen1Limit && gen1Hours) ? (gen1Limit - parseFloat(gen1Hours)) : null;
+    const gen1Remaining = Number.isFinite(gen1Limit) && Calc._num(gen1Hours) !== null ? gen1Limit - Calc._num(gen1Hours) : null;
 
     return `
     <div class="stat-grid">
@@ -108,7 +148,7 @@ const Analytics = {
       <div class="stat-card">
         <div class="stat-value">${monthlyGen !== null && monthlyGen !== undefined ? Calc.formatNumber(monthlyGen) : '-'}</div>
         <div class="stat-label">Last Period kWh</div>
-        ${dailyAvg ? `<div class="stat-sublabel">${Calc.formatNumber(dailyAvg)} kWh/day avg</div>` : ''}
+        ${dailyAvg !== null ? `<div class="stat-sublabel">${Calc.formatNumber(dailyAvg)} kWh/day avg</div>` : ''}
       </div>
       <div class="stat-card">
         <div class="stat-value">${Calc.formatNumber(totalTrips) || '-'}</div>
@@ -185,8 +225,8 @@ const Analytics = {
   renderGenHoursChart(inspections) {
     const sorted = [...inspections].sort((a, b) => new Date(a.general.date) - new Date(b.general.date));
     const labels = sorted.map(i => Calc.formatDateShort(i.general.date));
-    const gen1 = sorted.map(i => parseFloat(i.generators.gen1.runningHoursOnline) || null);
-    const gen2 = sorted.map(i => parseFloat(i.generators.gen2.runningHoursOnline) || null);
+    const gen1 = sorted.map(i => Calc._num(i.generators.gen1.runningHoursOnline));
+    const gen2 = sorted.map(i => Calc._num(i.generators.gen2.runningHoursOnline));
 
     const ctx = document.getElementById('chart-gen-hours');
     if (!ctx) return;
@@ -245,9 +285,9 @@ const Analytics = {
   renderBreakerTripChart(inspections) {
     const sorted = [...inspections].sort((a, b) => new Date(a.general.date) - new Date(b.general.date));
     const labels = sorted.map(i => Calc.formatDateShort(i.general.date));
-    const outdoor = sorted.map(i => parseFloat(i.switchgear.outdoorBreakerTripCount) || null);
-    const gen1cb = sorted.map(i => parseFloat(i.switchgear.gen1BreakerTripCount) || null);
-    const gen2cb = sorted.map(i => parseFloat(i.switchgear.gen2BreakerTripCount) || null);
+    const outdoor = sorted.map(i => Calc._num(i.switchgear.outdoorBreakerTripCount));
+    const gen1cb = sorted.map(i => Calc._num(i.switchgear.gen1BreakerTripCount));
+    const gen2cb = sorted.map(i => Calc._num(i.switchgear.gen2BreakerTripCount));
 
     const ctx = document.getElementById('chart-breaker-trips');
     if (!ctx) return;
@@ -314,10 +354,10 @@ const Analytics = {
   renderTempChart(inspections) {
     const sorted = [...inspections].sort((a, b) => new Date(a.general.date) - new Date(b.general.date));
     const labels = sorted.map(i => Calc.formatDateShort(i.general.date));
-    const temp1 = sorted.map(i => parseFloat(i.switchgear.mainTransformerTemp1) || null);
-    const temp2 = sorted.map(i => parseFloat(i.switchgear.mainTransformerTemp2) || null);
-    const gen1Bearing = sorted.map(i => parseFloat(i.generators.gen1.trustBearingTemp) || null);
-    const gen2Bearing = sorted.map(i => parseFloat(i.generators.gen2.trustBearingTemp) || null);
+    const temp1 = sorted.map(i => Calc._num(i.switchgear.mainTransformerTemp1));
+    const temp2 = sorted.map(i => Calc._num(i.switchgear.mainTransformerTemp2));
+    const gen1Bearing = sorted.map(i => Calc._num(i.generators.gen1.trustBearingTemp));
+    const gen2Bearing = sorted.map(i => Calc._num(i.generators.gen2.trustBearingTemp));
 
     const ctx = document.getElementById('chart-temp');
     if (!ctx) return;
@@ -342,10 +382,10 @@ const Analytics = {
   renderRTDChart(inspections) {
     const sorted = [...inspections].sort((a, b) => new Date(a.general.date) - new Date(b.general.date));
     const labels = sorted.map(i => Calc.formatDateShort(i.general.date));
-    const gen1Stator = sorted.map(i => parseFloat(i.generators.gen1.statorRTDTemp) || null);
-    const gen1BearingRTD = sorted.map(i => parseFloat(i.generators.gen1.bearingRTDTemp) || null);
-    const gen2Stator = sorted.map(i => parseFloat(i.generators.gen2.statorRTDTemp) || null);
-    const gen2BearingRTD = sorted.map(i => parseFloat(i.generators.gen2.bearingRTDTemp) || null);
+    const gen1Stator = sorted.map(i => Calc._num(i.generators.gen1.statorRTDTemp));
+    const gen1BearingRTD = sorted.map(i => Calc._num(i.generators.gen1.bearingRTDTemp));
+    const gen2Stator = sorted.map(i => Calc._num(i.generators.gen2.statorRTDTemp));
+    const gen2BearingRTD = sorted.map(i => Calc._num(i.generators.gen2.bearingRTDTemp));
 
     const ctx = document.getElementById('chart-rtd');
     if (!ctx) return;

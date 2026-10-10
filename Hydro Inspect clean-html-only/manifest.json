@@ -4,8 +4,8 @@
   "description": "Monthly electrical and electronic inspection data recorder for mini hydro power plants",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f0f4ff",
-  "theme_color": "#1e40af",
+  "background_color": "#f3f7f8",
+  "theme_color": "#12353f",
   "orientation": "portrait",
   "icons": [
     {

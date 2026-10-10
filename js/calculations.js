@@ -4,9 +4,9 @@
 const Calc = {
   // Calculate difference between current and previous reading
   diff(current, previous) {
-    const c = parseFloat(current);
-    const p = parseFloat(previous);
-    if (isNaN(c) || isNaN(p)) return null;
+    const c = this._num(current);
+    const p = this._num(previous);
+    if (c === null || p === null) return null;
     return c - p;
   },
 
@@ -35,8 +35,9 @@ const Calc = {
 
   _num(v) {
     if (v === null || v === undefined || v === '') return null;
-    const n = parseFloat(v);
-    return isNaN(n) ? null : n;
+    if (typeof v === 'string' && !v.trim()) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
   },
 
   _valueAt(obj, path) {
@@ -200,7 +201,7 @@ const Calc = {
 
   // Calculate daily average generation
   dailyAverage(totalKwh, days) {
-    if (!totalKwh || !days || days <= 0) return null;
+    if (this._num(totalKwh) === null || !Number.isFinite(days) || days <= 0 || totalKwh < 0) return null;
     return totalKwh / days;
   },
 
@@ -252,11 +253,11 @@ const Calc = {
 
     sorted.forEach(insp => {
       labels.push(this.formatDateShort(insp.general.date));
-      cebImported.push(parseFloat(insp.cebMeter.importedTotal) || 0);
+      cebImported.push(this._num(insp.cebMeter.importedTotal));
       const date = insp.general.date;
-      gen1.push(this.normalizedReading('gen1Panel', insp.powerAnalyzers.gen1PanelKWh, date) || 0);
-      gen2.push(this.normalizedReading('gen2Panel', insp.powerAnalyzers.gen2PanelKWh, date) || 0);
-      transformer.push(this.normalizedReading('transformerPanel', insp.powerAnalyzers.transformerPanelKWh, date) || 0);
+      gen1.push(this.normalizedReading('gen1Panel', insp.powerAnalyzers.gen1PanelKWh, date));
+      gen2.push(this.normalizedReading('gen2Panel', insp.powerAnalyzers.gen2PanelKWh, date));
+      transformer.push(this.normalizedReading('transformerPanel', insp.powerAnalyzers.transformerPanelKWh, date));
     });
 
     return { labels, cebImported, gen1, gen2, transformer };
@@ -274,10 +275,10 @@ const Calc = {
       const prev = sorted[i - 1];
       const diff = this.diff(curr.cebMeter.importedTotal, prev.cebMeter.importedTotal);
       const days = Math.round((new Date(curr.general.date) - new Date(prev.general.date)) / 86400000);
-      if (diff !== null && days > 0) {
+      if (diff !== null && diff >= 0 && days > 0) {
         labels.push(this.formatDateShort(curr.general.date));
         monthlyKwh.push(diff);
-        dailyAvg.push(Math.round(diff / days));
+        dailyAvg.push(diff / days);
       }
     }
     return { labels, monthlyKwh, dailyAvg };
@@ -304,7 +305,7 @@ const Calc = {
   formatDateShort(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' });
   },
 
   formatDateFull(dateStr) {

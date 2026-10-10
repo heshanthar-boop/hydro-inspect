@@ -9,7 +9,8 @@
     "make-icon": "node scripts/make-icon.js",
     "pack": "npm run make-icon && node node_modules/electron-builder/cli.js --dir",
     "dist": "npm run make-icon && node node_modules/electron-builder/cli.js --win nsis",
-    "portable": "npm run make-icon && node scripts/build-portable.js"
+    "portable": "npm run make-icon && node scripts/build-portable.js",
+    "test": "node tests/calculations.test.cjs"
   },
   "build": {
     "appId": "com.hydroinspect.app",

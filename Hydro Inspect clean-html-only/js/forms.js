@@ -13,7 +13,7 @@ const Forms = {
   async init(inspection, container) {
     this.currentInspection = inspection;
     await Calc.loadMeterConfig();
-    this.previousInspection = await Store.getPreviousInspection(inspection.general.date);
+    this.previousInspection = await Store.getPreviousInspection(inspection.general.date, inspection.general.plantName);
     this.diffs = this.previousInspection
       ? Calc.calculateKWhDiffs(inspection, this.previousInspection)
       : null;
@@ -21,6 +21,17 @@ const Forms = {
     container.innerHTML = this.renderForm();
     this.bindEvents(container);
     this.bindAutoSave(container);
+    const headers = [...container.querySelectorAll('.card-header[data-toggle]')];
+    const nav = document.createElement('div'); nav.className = 'inspection-nav';
+    nav.innerHTML = '<label>Jump to section<select class="form-input"><option value="">Choose section…</option>' + headers.map((h,i) => `<option value="${i}">${this.esc(h.textContent.trim())}</option>`).join('') + '</select></label><span id="inspection-save-state" role="status">Changes save automatically on field change</span>';
+    container.prepend(nav);
+    nav.querySelector('select').addEventListener('change', e => {
+      if (e.target.value === '') return;
+      const header = headers[Number(e.target.value)];
+      header.nextElementSibling.classList.remove('collapsed');
+      header.querySelector('.toggle-icon')?.classList.remove('collapsed');
+      header.scrollIntoView({behavior:'smooth',block:'start'});
+    });
   },
 
   renderForm() {
@@ -896,6 +907,7 @@ const Forms = {
     </div>
     <div class="btn-group">
       <button class="btn btn-outline" id="generate-pdf">Generate PDF Report</button>
+      <button class="btn btn-outline" id="generate-html">Download HTML Report</button>
       <button class="btn btn-outline" id="email-report">Email Report</button>
     </div>`;
   },
@@ -1137,7 +1149,16 @@ const Forms = {
     if (pdfBtn) pdfBtn.addEventListener('click', async () => {
       this.collectFormData(container);
       const photos = await Store.getPhotosForInspection(this.currentInspection.id);
-      Reports.generatePDF(this.currentInspection, photos);
+      pdfBtn.disabled = true;
+      try { await Store.saveInspection(this.currentInspection); await Reports.generatePDF(this.currentInspection, photos); }
+      catch (error) { App.toast('Report failed: ' + error.message, 'error'); }
+      finally { pdfBtn.disabled = false; }
+    });
+
+    container.querySelector('#generate-html')?.addEventListener('click', async () => {
+      this.collectFormData(container);
+      try { await Store.saveInspection(this.currentInspection); await Reports.downloadHTML(this.currentInspection); }
+      catch (error) { App.toast('Report failed: ' + error.message, 'error'); }
     });
 
     // Email
@@ -1154,16 +1175,24 @@ const Forms = {
       input.addEventListener('change', () => {
         clearTimeout(this._saveTimeout);
         this._saveTimeout = setTimeout(() => {
+          this._saveTimeout = null;
           this.collectFormData(container);
-          Store.saveInspection(this.currentInspection);
-        }, 1200);
+          this.saveDraft();
+        }, 600);
       });
     });
   },
 
+  async saveDraft() {
+    const status = document.getElementById('inspection-save-state');
+    if (status) status.textContent = 'Saving…';
+    try { await Store.saveInspection(this.currentInspection); if (status) status.textContent = 'Saved on this device'; }
+    catch (error) { if (status) status.textContent = 'Save failed — retry with Save inspection'; App.toast('Unable to save: ' + error.message, 'error'); }
+  },
+
   _autoSaveNow() {
     clearTimeout(this._saveTimeout);
-    Store.saveInspection(this.currentInspection);
+    this.saveDraft();
   },
 
   // Collect all [data-field] inputs into inspection object
