@@ -91,9 +91,14 @@ const Store = {
 
   async saveInspection(inspection, opts) {
     const silent = opts && opts.silent;
+    if(!silent && !Access.isOwner()) throw new Error('Only the owner can edit inspections');
     const db = await this.open();
     // Preserve the record's own updatedAt when saving silently (e.g. from a cloud pull)
-    if (!silent) inspection.updatedAt = new Date().toISOString();
+    if (!silent) {
+      const actor=Access.actor();const existing=await this.getInspection(inspection.id);
+      inspection.audit={created:existing?.audit?.created || actor,lastEdited:actor};
+      inspection.updatedAt = new Date().toISOString();
+    }
     // Mark unsynced until Firebase confirms push. Cleared by FirebaseSync on success.
     if (!silent) inspection._pendingSync = true;
     return new Promise((resolve, reject) => {
@@ -129,6 +134,7 @@ const Store = {
   },
 
   async deleteInspection(id) {
+    if(!Access.isOwner()) throw new Error('Only the owner can delete inspections');
     const db = await this.open();
     // Also delete all photos for this inspection
     await this.deletePhotosForInspection(id);
@@ -282,7 +288,8 @@ const Store = {
     });
   },
 
-  async saveSettings(settings) {
+  async saveSettings(settings, opts = {}) {
+    if(!opts.silent && Access.isOwner()) settings._sharedPending=true;
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction('settings', 'readwrite');
@@ -307,7 +314,7 @@ const Store = {
         for (const insp of inspections) {
           // Ensure new fields exist on old records
           this._upgradeInspectionSchema(insp);
-          await this.saveInspection(insp);
+          await this.saveInspection(insp,{silent:true});
         }
         console.log(`Migrated ${inspections.length} inspections from localStorage`);
       } catch (e) {
@@ -318,7 +325,7 @@ const Store = {
     const settingsData = localStorage.getItem(OLD_SETTINGS);
     if (settingsData) {
       try {
-        await this.saveSettings({ ...this.defaultSettings, ...JSON.parse(settingsData) });
+        await this.saveSettings({ ...this.defaultSettings, ...JSON.parse(settingsData) },{silent:true});
       } catch (e) {}
     }
 
@@ -485,7 +492,11 @@ const Store = {
 
   async saveDailyReading(record, opts = {}) {
     const db=await this.open();
-    if(!opts.silent) { record.updatedAt=new Date().toISOString(); record._pendingSync=true; }
+    if(!opts.silent) {
+      const existing=(await this.getDailyReadings()).find(r=>r.id===record.id);
+      if(existing && !Access.canEditDaily(existing)) throw new Error('You can only correct readings entered by this visitor or account');
+      const actor=Access.actor();record.audit={created:existing?.audit?.created || actor,lastEdited:actor};
+      record.updatedAt=new Date().toISOString(); record._pendingSync=true; }
     await new Promise((resolve,reject)=>{
       const tx=db.transaction('dailyReadings','readwrite'); tx.objectStore('dailyReadings').put(record);
       tx.oncomplete=resolve; tx.onabort=()=>reject(tx.error || new Error('Daily reading save failed')); tx.onerror=()=>reject(tx.error);

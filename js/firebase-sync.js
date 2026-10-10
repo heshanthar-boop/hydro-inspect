@@ -47,6 +47,7 @@ const FirebaseSync = (() => {
       _user = user;
       _updateSignInUI();
       if (_onAuthChange) _onAuthChange(user);
+      if(!user) _auth.signInAnonymously().catch(error=>console.warn('Visitor cloud access requires Anonymous Authentication to be enabled',error.code));
     });
   }
 
@@ -77,7 +78,7 @@ const FirebaseSync = (() => {
   function _updateSignInUI() {
     const btn = document.getElementById('fb-signin-btn');
     if (!btn) return;
-    if (_user) {
+    if (_user && !_user.isAnonymous) {
       const name  = _user.displayName ? _user.displayName.split(' ')[0] : 'User';
       const photo = _user.photoURL;
       btn.innerHTML = photo
@@ -120,7 +121,7 @@ const FirebaseSync = (() => {
     btn.innerHTML = '&#128274; Sign In';
     btn.title = 'Sign in with Google to sync your data';
     btn.addEventListener('click', () => {
-      if (_user) _showAccountMenu(btn);
+      if (_user && !_user.isAnonymous) _showAccountMenu(btn);
       else signIn();
     });
     container.appendChild(btn);
@@ -178,6 +179,7 @@ const FirebaseSync = (() => {
 
   function _userCol(path) {
     if (!_user || !_db) return null;
+    if(['hydro_inspections','hydro_daily_readings'].includes(path)) return _db.collection(`hydro_workspaces/main/${path}`);
     return _db.collection(`users/${_user.uid}/${path}`);
   }
 
@@ -206,7 +208,7 @@ const FirebaseSync = (() => {
   }
 
   async function saveInspection(inspection) {
-    if (!isSignedIn()) return false;
+    if (!isSignedIn() || !Access.isOwner()) return false;
     if (!navigator.onLine) return false;
     const col = _userCol('hydro_inspections');
     if (!col) return false;
@@ -237,6 +239,12 @@ const FirebaseSync = (() => {
       const snap = await col.get();
       const remote = {};
       snap.forEach(doc => { remote[doc.id] = doc.data(); });
+      if(Access.isOwner()) {
+        const legacy=await _db.collection(`users/${_user.uid}/hydro_inspections`).get();
+        for(const doc of legacy.docs) if(!remote[doc.id]) {
+          const data=doc.data();if(await saveInspection(data)) remote[doc.id]=data;
+        }
+      }
       return remote;
     } catch (e) {
       console.error('FirebaseSync.pullInspections:', e);
@@ -272,6 +280,13 @@ const FirebaseSync = (() => {
     _setSyncBadge('syncing');
 
     try {
+      const settingsDoc=_db.doc('hydro_workspaces/main/config/meters');
+      const settingsSnapshot=await settingsDoc.get();
+      const settings=await Store.getSettings();
+      if(Access.isOwner() && (!settingsSnapshot.exists || settings._sharedPending)) {
+        await settingsDoc.set({plantName:settings.plantName,plantLocation:settings.plantLocation,meterChanges:settings.meterChanges || []});
+        settings._sharedPending=false;await Store.saveSettings(settings,{silent:true});
+      } else if(settingsSnapshot.exists) await Store.saveSettings({...settings,...settingsSnapshot.data()},{silent:true});
       // Pull remote first so we can do per-record conflict resolution by updatedAt.
       const remote = await pullInspections();
       if (!remote) {
@@ -289,7 +304,7 @@ const FirebaseSync = (() => {
       for (const l of local) {
         const remoteRec = remote[String(l.id)];
         const newer = _newerSide(l, remoteRec);
-        if (!remoteRec || newer === 'local') {
+        if (Access.isOwner() && (!remoteRec || newer === 'local')) {
           const ok = await saveInspection(l);
           if (ok) pushed++;
           else    failed++;
@@ -343,7 +358,7 @@ const FirebaseSync = (() => {
   function onInspectionSaved(inspection) {
     // If offline or not signed in, the record stays marked _pendingSync in IndexedDB
     // and will be flushed by the 'online' listener in app.js calling syncAll().
-    if (!isSignedIn() || !navigator.onLine) return;
+    if (!isSignedIn() || !navigator.onLine || !Access.isOwner()) return;
     saveInspection(inspection).then(ok => {
       if (ok) _setSyncBadge('cloud');
     });
@@ -358,12 +373,15 @@ const FirebaseSync = (() => {
     const seen=new Set();
     for(const record of local) {
       seen.add(record.id); const r=remote.get(record.id);
-      if(!r || _newerSide(record,r)==='local') {
-        await col.doc(record.id).set({...record,_pendingSync:false});
+      if(record.audit && !record._shared && !record.audit.created.uid && record.audit.created.deviceId===Access.actor().deviceId) {record.audit.created.uid=_user.uid;record.audit.lastEdited=Access.actor();}
+      if(!record.audit && Access.isOwner()) {const actor=Access.actor();record.audit={created:actor,lastEdited:actor};}
+      const editable=Access.isOwner() || record.audit?.created?.uid===_user.uid;
+      if(editable && (!r || _newerSide(record,r)==='local')) {
+        await col.doc(record.id).set({...record,_pendingSync:false,_shared:true,_serverEditedAt:firebase.firestore.FieldValue.serverTimestamp()});
         await Store.saveDailyReading({...record,_pendingSync:false},{silent:true});
-      } else if(_newerSide(record,r)==='remote' || record._pendingSync) await Store.saveDailyReading({...r,_pendingSync:false},{silent:true});
+      } else if(r && (_newerSide(record,r)==='remote' || record._pendingSync || !editable)) await Store.saveDailyReading({...r,_shared:true,_pendingSync:false},{silent:true});
     }
-    for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_pendingSync:false},{silent:true});
+    for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_shared:true,_pendingSync:false},{silent:true});
   }
 
   function onDailyReadingSaved(record) {
