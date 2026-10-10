@@ -384,13 +384,40 @@ const FirebaseSync = (() => {
     for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_shared:true,_pendingSync:false},{silent:true});
   }
 
+  let dailyPushQueue=Promise.resolve();
+  async function pushDailyReading(record) {
+    if(!isSignedIn() || !navigator.onLine) return;
+    const uid=_user.uid, owner=Access.isOwner();
+    const clean=JSON.parse(JSON.stringify(record));
+    if(!clean.audit && owner) {const actor=Access.actor();clean.audit={created:actor,lastEdited:actor};}
+    if(clean.audit && !clean._shared && !clean.audit.created.uid && clean.audit.created.deviceId===Access.actor().deviceId) {
+      clean.audit.created.uid=uid;clean.audit.lastEdited=Access.actor();
+    }
+    if(!owner && clean.audit?.created?.uid!==uid) return;
+    const ref=_userCol('hydro_daily_readings').doc(clean.id);
+    const result=await _db.runTransaction(async tx=>{
+      const snapshot=await tx.get(ref),remote=snapshot.exists ? snapshot.data() : null;
+      if(remote && _newerSide(clean,remote)==='remote') return remote;
+      if(remote) clean.audit.created=remote.audit.created;
+      tx.set(ref,{...clean,_pendingSync:false,_shared:true,_serverEditedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      return {...clean,_pendingSync:false,_shared:true};
+    });
+    // Never replace a newer local edit with the result of an older upload.
+    const current=(await Store.getDailyReadings()).find(r=>r.id===clean.id);
+    if(current && current.updatedAt===record.updatedAt) await Store.saveDailyReading(result,{silent:true});
+  }
+
   function onDailyReadingSaved(record) {
     if(!isSignedIn() || !navigator.onLine) return;
-    // Full reconciliation prevents overwriting a newer cloud edit.
-    syncDailyReadings().catch(error=>{console.warn('Daily sync failed',error); App.toast('Daily reading saved locally; cloud sync needs retry','warning');});
+    const snapshot=JSON.parse(JSON.stringify(record));
+    // Upload one changed document instead of reading the entire history per field.
+    dailyPushQueue=dailyPushQueue.catch(()=>{}).then(()=>pushDailyReading(snapshot)).catch(error=>{
+      console.warn('Daily upload failed; record remains queued locally',error.code || error.message);
+    });
   }
 
   return {
+    pushDailyReading,
     syncDailyReadings,
     onDailyReadingSaved,
     init,
