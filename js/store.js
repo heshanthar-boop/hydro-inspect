@@ -5,7 +5,7 @@
  */
 const Store = {
   DB_NAME: 'hydroinspect',
-  DB_VERSION: 2,
+  DB_VERSION: 3,
   db: null,
 
   defaultSettings: {
@@ -47,6 +47,7 @@ const Store = {
           const photos = db.createObjectStore('photos', { keyPath: 'id' });
           photos.createIndex('inspectionId', 'inspectionId');
         }
+        if (!db.objectStoreNames.contains('dailyReadings')) db.createObjectStore('dailyReadings', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
@@ -54,6 +55,7 @@ const Store = {
 
       req.onsuccess = (e) => {
         this.db = e.target.result;
+        this.db.onversionchange = () => { this.db.close(); this.db = null; };
         resolve(this.db);
       };
       req.onerror = () => reject(req.error);
@@ -472,14 +474,35 @@ const Store = {
 
   // ===== Export / Import =====
 
+  async getDailyReadings() {
+    const db=await this.open();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('dailyReadings','readonly').objectStore('dailyReadings').getAll();
+      req.onsuccess=()=>resolve(req.result.sort((a,b)=>b.date.localeCompare(a.date)));
+      req.onerror=()=>reject(req.error);
+    });
+  },
+
+  async saveDailyReading(record, opts = {}) {
+    const db=await this.open();
+    if(!opts.silent) { record.updatedAt=new Date().toISOString(); record._pendingSync=true; }
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('dailyReadings','readwrite'); tx.objectStore('dailyReadings').put(record);
+      tx.oncomplete=resolve; tx.onabort=()=>reject(tx.error || new Error('Daily reading save failed')); tx.onerror=()=>reject(tx.error);
+    });
+    if(!opts.silent && typeof FirebaseSync!=='undefined') FirebaseSync.onDailyReadingSaved(record);
+    return record;
+  },
+
   async exportData() {
     const inspections = await this.getInspections();
     const settings = await this.getSettings();
     return JSON.stringify({
       inspections,
+      dailyReadings: await this.getDailyReadings(),
       settings,
       exportedAt: new Date().toISOString(),
-      version: 2,
+      version: 3,
     }, null, 2);
   },
 
@@ -491,6 +514,7 @@ const Store = {
         await this.saveInspection(insp);
       }
     }
+    if (Array.isArray(data.dailyReadings)) for (const record of data.dailyReadings) await this.saveDailyReading(record);
     if (data.settings) {
       await this.saveSettings(data.settings);
     }
