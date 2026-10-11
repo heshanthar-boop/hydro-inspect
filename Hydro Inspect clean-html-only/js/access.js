@@ -7,7 +7,8 @@ const Access = {
     const u=FirebaseSync.getUser();
     return {uid:u?.uid || '',email:u?.email || '',visitor:!u || !!u.isAnonymous,deviceId:id,deviceLabel:navigator.userAgentData?.platform || navigator.platform || 'Browser',userAgent:navigator.userAgent,clientTime:new Date().toISOString(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone};
   },
-  canEditDaily(record) {return this.isOwner() || (!!record?.audit?.created?.uid && record.audit.created.uid===FirebaseSync.getUser()?.uid) || (!record?.audit?.created?.uid && record?.audit?.created?.deviceId===this.actor().deviceId && !record._shared);},
+  canEditDaily(record) {return this.isOwner();},
+  canContinueDaily(record) {return this.isOwner() || (record?.draft && ((!record.audit && !record._shared) || (record.audit?.created?.uid && record.audit.created.uid===FirebaseSync.getUser()?.uid) || (!record.audit?.created?.uid && record.audit?.created?.deviceId===this.actor().deviceId && !record._shared)));},
   updateUI() {
     document.querySelectorAll('[data-page="new-inspection"],[data-page="settings"]').forEach(el=>el.hidden=!this.isOwner());
   }

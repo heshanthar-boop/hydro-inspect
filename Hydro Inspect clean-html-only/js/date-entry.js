@@ -21,7 +21,7 @@ const DateEntry = {
         input.addEventListener('change',() => { original.value = input.value; original.dispatchEvent(new Event('change',{bubbles:true})); });
         const hint = document.createElement('small'); hint.className='form-hint'; hint.textContent='Existing text kept above. Choose a new value below to replace it.'; original.insertAdjacentElement('afterend',hint);
       } else if (original.type === 'text') { original.type=kind; }
-      if (kind === 'time') input.step = original.id.startsWith('evt-time-') ? '1' : '60';
+      if (kind === 'time') input.step = input.getAttribute('step') || (original.id.startsWith('evt-time-') ? '1' : '60');
       if (!input.getAttribute('aria-label') && !input.closest('label')) input.setAttribute('aria-label',original.closest('.form-group')?.querySelector('label')?.textContent.trim() || (kind==='date' ? 'Date' : 'Time'));
       const tools=document.createElement('div'); tools.className='date-entry-tools';
       const set = value => { if(input.readOnly || input.disabled) return; input.value=value; input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true})); };

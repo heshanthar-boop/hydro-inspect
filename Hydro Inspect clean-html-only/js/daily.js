@@ -58,6 +58,8 @@ const Daily = {
     const autosave=()=>{
       clearTimeout(debounce);
       const r=collect();
+      const existing=records.find(x=>x.id===r.id);
+      if(existing && !Access.canContinueDaily(existing)){state.textContent='Submitted reading is locked. Choose New reading.';return queue;}
       const fingerprint=JSON.stringify(r);
       if(!r.plant || !r.date || r.date>DateEntry.localDate()) { state.textContent='Choose a valid plant and reading date'; return queue; }
       const invalid=[...form.querySelectorAll('input[type=number]')].find(el=>el.validity.badInput || el.validity.rangeUnderflow || el.validity.rangeOverflow || el.validity.stepMismatch);
@@ -65,11 +67,11 @@ const Daily = {
       form.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
       if(!records.some(x=>x.id===r.id) && !r.notes && Object.values(r.readings).every(v=>v==='')) { state.textContent='Ready for entry'; return queue; }
       if(records.some(x=>x.id!==r.id && x.plant===r.plant && this.stamp(x)===this.stamp(r))) {state.textContent='A reading already exists at this time. Open it or choose another time.';return queue;}
-      r.draft=!r.operator || !r.time || Object.values(r.readings).some(value=>value==='');
+      r.draft=Access.isOwner() ? (!r.operator || !r.time || Object.values(r.readings).some(value=>value==='')) : true;
       records=this.sort([r,...records.filter(x=>x.id!==r.id)]);
       state.textContent='Saving…';
       queue=queue.catch(()=>{}).then(()=>Store.saveDailyReading(r)).then(()=>{
-        if(form.isConnected) { if(JSON.stringify(collect())===fingerprint) state.textContent=r.draft ? 'Draft saved on this device' : 'Saved on this device'; refresh(); }
+        if(form.isConnected) { if(JSON.stringify(collect())===fingerprint) state.textContent=r.draft ? 'Draft saved — tap Finish when ready' : 'Saved on this device'; refresh(); }
       }).catch(error=>{state.textContent='Save failed — tap Finish to retry';App.toast('Daily save failed: '+error.message,'error');});
       return queue;
     };
@@ -97,7 +99,7 @@ const Daily = {
     };
     form.querySelector('#daily-date').addEventListener('change',autosave);form.querySelector('#daily-plant').addEventListener('change',refresh);
     container.querySelector('#daily-new').addEventListener('click',async()=>{const pending=autosave();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=true);await pending;activeId='daily_'+crypto.randomUUID();form.querySelector('#daily-date').value=DateEntry.localDate();load();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=false);form.querySelector('[data-daily]').focus();});
-    container.querySelector('#daily-history').addEventListener('click',async e=>{const btn=e.target.closest('[data-load-daily]');if(!btn)return;await autosave();const r=records.find(x=>x.id===btn.dataset.loadDaily);if(!r || !Access.canEditDaily(r))return;activeId=r.id;form.querySelector('#daily-date').value=r.date;form.querySelector('#daily-plant').value=r.plant;load();});
+    container.querySelector('#daily-history').addEventListener('click',async e=>{const remove=e.target.closest('[data-delete-daily]');if(remove){if(!Access.isOwner() || !confirm('Delete this meter reading? Period comparisons will be recalculated.'))return;clearTimeout(debounce);await queue;try{await Store.deleteDailyReading(remove.dataset.deleteDaily);if(activeId===remove.dataset.deleteDaily)activeId='daily_'+crypto.randomUUID();records=await Store.getDailyReadings();load();App.toast('Reading deleted','success');}catch(error){App.toast(error.message,'error');}return;}const btn=e.target.closest('[data-load-daily]');if(!btn)return;await autosave();const r=records.find(x=>x.id===btn.dataset.loadDaily);if(!r || !Access.canEditDaily(r))return;activeId=r.id;form.querySelector('#daily-date').value=r.date;form.querySelector('#daily-plant').value=r.plant;load();});
     form.querySelectorAll('[data-daily]').forEach(el=>{el.addEventListener('input',refresh);el.addEventListener('change',refresh);});
     form.querySelectorAll('input:not(#daily-date):not(#daily-plant),textarea,select').forEach(el=>{
       el.addEventListener('input',()=>{state.textContent='Unsaved changes';clearTimeout(debounce);debounce=setTimeout(autosave,800);});
@@ -105,15 +107,17 @@ const Daily = {
     });
     form.addEventListener('submit',async e=>{
       e.preventDefault(); if(!form.reportValidity()) return;
-      const r=collect(); r.draft=false;
+      const r=collect();
+      if(records.some(x=>x.id===r.id&&!Access.canContinueDaily(x))) {App.toast('Submitted reading is locked. Choose New reading.','warning');return;}
+      r.draft=false;
       if(records.some(x=>x.id!==r.id && x.plant===r.plant && this.stamp(x)===this.stamp(r))) {App.toast('A record already exists at that time','error');return;} if(!r.plant || !r.operator) { App.toast('Enter plant and operator names','error');return; }
       if(r.date>DateEntry.localDate()) { App.toast('Reading date cannot be in the future','error');return; }
       const btn=form.querySelector('#daily-save');btn.disabled=true;
-      try { clearTimeout(debounce); await queue; await Store.saveDailyReading(r);records=await Store.getDailyReadings();load();App.toast('Daily readings saved','success'); }
+      try { clearTimeout(debounce); await queue; await Store.saveDailyReading(r);records=await Store.getDailyReadings();load();if(!Access.isOwner()){form.querySelectorAll('[data-daily],#daily-operator,#daily-notes').forEach(el=>el.disabled=true);state.textContent='Submitted. Owner can correct this record; use New reading for another entry.';}App.toast('Daily readings submitted','success'); }
       catch(error){App.toast('Save failed: '+error.message,'error');} finally {btn.disabled=false;}
     });
     container.querySelector('#daily-csv').addEventListener('click',()=>this.exportCSV(records.filter(r=>r.plant===collect().plant)));
-    const draft=records.find(r=>r.draft && Access.canEditDaily(r) && (r.audit?.created?.uid===FirebaseSync.getUser()?.uid || (!r.audit?.created?.uid && r.audit?.created?.deviceId===Access.actor().deviceId)));
+    const draft=records.find(r=>r.draft && Access.canContinueDaily(r) && (r.audit?.created?.uid===FirebaseSync.getUser()?.uid || (!r.audit?.created?.uid && r.audit?.created?.deviceId===Access.actor().deviceId)));
     if(draft){activeId=draft.id;form.querySelector('#daily-date').value=draft.date;form.querySelector('#daily-plant').value=draft.plant;}
     load();
   },
@@ -126,7 +130,7 @@ const Daily = {
   history(records) {
     if(!records.length)return '<p class="form-hint">No readings saved for this plant.</p>';
     records=this.sort(records);
-    const cumulative=`<h4>Cumulative readings</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>Reading time</th>${this.channels.map(c=>`<th>${c.label} kWh</th>`).join('')}<th></th></tr></thead><tbody>${records.map(r=>`<tr><td>${Forms.esc(this.stamp(r).replace('T',' '))}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(r.readings[c.key])}</td>`).join('')}<td>${Access.canEditDaily(r)?`<button type="button" class="btn btn-outline btn-sm" data-load-daily="${Forms.esc(r.id)}">Open / correct</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+    const cumulative=`<h4>Cumulative readings</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>Reading time</th>${this.channels.map(c=>`<th>${c.label} kWh</th>`).join('')}<th></th></tr></thead><tbody>${records.map(r=>`<tr><td>${Forms.esc(this.stamp(r).replace('T',' '))}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(r.readings[c.key])}</td>`).join('')}<td>${Access.canEditDaily(r)?`<button type="button" class="btn btn-outline btn-sm" data-load-daily="${Forms.esc(r.id)}">Edit</button><button type="button" class="btn btn-danger btn-sm" data-delete-daily="${Forms.esc(r.id)}">Delete</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
     const differences=`<h4>Energy between consecutive records</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>From</th><th>To</th><th>Hours</th>${this.channels.map(c=>`<th>${c.label} Δ kWh</th>`).join('')}<th>Generator total</th><th>Net CEB import</th><th>Status</th></tr></thead><tbody>${records.map(r=>{const d=this.calculate(r,records);return `<tr><td>${d.previous?Forms.esc(this.stamp(d.previous).replace('T',' ')):'Baseline'}</td><td>${Forms.esc(this.stamp(r).replace('T',' '))}</td><td>${Calc.formatNumber(d.days===null?null:d.days*24)}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(d.values[c.key])}</td>`).join('')}<td>${Calc.formatNumber(d.values.generation)}</td><td>${Calc.formatNumber(d.values.netImport)}</td><td>${r.draft?'Draft':d.warnings.length?'Review':r._pendingSync?'Local':'Synced'}</td></tr>`;}).join('')}</tbody></table></div>`;
     const rates=`<h4>Normalized daily energy (kWh / 24 hours)</h4><p class="form-hint">Rates are interval averages, not measured calendar-day totals.</p><div class="table-scroll"><table class="history-table"><thead><tr><th>Record</th>${this.channels.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${records.map(r=>{const d=this.calculate(r,records);return `<tr><td>${Forms.esc(this.stamp(r))}</td>${this.channels.map(c=>`<td>${Calc.formatNumber(d.days>0 && d.values[c.key]!==null && d.values[c.key]!==undefined ? d.values[c.key]/d.days:null)}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`;
     const audit=`<h4>Entry trace</h4><div class="table-scroll"><table class="history-table"><thead><tr><th>Reading time</th><th>Operator</th><th>Account / visitor</th><th>Browser device</th><th>Created (UTC)</th><th>Last edited (UTC)</th></tr></thead><tbody>${records.map(r=>`<tr><td>${Forms.esc(this.stamp(r))}</td><td>${Forms.esc(r.operator)}</td><td>${Forms.esc(r.audit?.created?.email || r.audit?.created?.uid || 'Legacy — untracked')}</td><td>${Forms.esc(r.audit?.created?.deviceLabel || '')} ${Forms.esc(r.audit?.created?.deviceId || '')}</td><td>${Forms.esc(r.audit?.created?.clientTime || '')}</td><td>${Forms.esc(r.audit?.lastEdited?.clientTime || '')}</td></tr>`).join('')}</tbody></table></div>`;
