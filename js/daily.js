@@ -36,6 +36,7 @@ const Daily = {
     const settings=await Store.getSettings();
     await Calc.loadMeterConfig();
     let records=await Store.getDailyReadings();
+    if(!container.isConnected)return;
     const plants=[...new Set([settings.plantName,...records.map(r=>r.plant)])];
     container.innerHTML=`<div class="page-intro"><span class="eyebrow">OPERATOR DAILY LOG</span><h1>Daily meter readings</h1><p>Enter cumulative kWh readings at a consistent time each day. Daily differences are calculated automatically.</p></div>
       <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label>${Access.isOwner() ? `<input class="form-input" id="daily-operator" value="${Forms.esc(this.ownerName())}" readonly><small class="form-hint">Using your signed-in account automatically</small>` : `<select class="form-select" id="daily-operator" required><option value="">Choose operator…</option>${this.operatorNames.map(name=>`<option value="${name}">${name}</option>`).join('')}</select>`}</div></div>
