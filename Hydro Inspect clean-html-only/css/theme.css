@@ -217,3 +217,8 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 .inspection-record-grid .record-card { margin-bottom:0;min-width:0; }
 @media(max-width:700px) { .daily-record-grid,.inspection-record-grid { grid-template-columns:1fr; } .daily-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .daily-overview-grid>div:first-child { grid-column:1/-1; } .daily-overview-grid strong { font-size:22px; } .daily-overview-grid span,.daily-overview-grid small { font-size:13px; } .reading-value-grid span { font-size:14px; } .reading-value-grid strong { font-size:22px; } .reading-value-grid strong small { font-size:14px; } .record-period-strip p { font-size:14px; } .record-period-strip span { font-size:12px; } .record-status { font-size:12px; } .daily-section-nav button { font-size:13px; } .record-details summary span { display:none; } }
 @media(max-width:360px) { .reading-value-grid { grid-template-columns:1fr; } }
+
+#daily-history-section { scroll-margin-top:95px; }
+.record-history-heading { flex-wrap:wrap;gap:12px;margin-bottom:18px; }
+.record-history-heading h3 { margin-bottom:0; }
+@media(max-width:650px) { .record-history-heading h3 { flex:1 0 100%; } .record-history-heading button { flex:1; } }
