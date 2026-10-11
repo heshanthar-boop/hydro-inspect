@@ -10,7 +10,7 @@ const DailyCharts = {
   aggregate(records,mode) {
     const complete=Daily.sort(records.filter(r=>!r.draft));const groups=new Map();
     for(const r of complete){const d=Daily.calculate(r,complete);if(!d.previous)continue;
-      const key=this.bucket(r.date,mode);if(!groups.has(key))groups.set(key,{key,values:{},counts:{},intervals:0,gaps:0});
+      const key=this.bucket(Daily.stamp(r).slice(0,10),mode);if(!groups.has(key))groups.set(key,{key,values:{},counts:{},intervals:0,gaps:0});
       const g=groups.get(key);g.intervals++;if(d.days>1)g.gaps++;
       const add=(name,value)=>{if(value===null||value===undefined||!Number.isFinite(value))return;g.values[name]=(g.values[name]??0)+value;g.counts[name]=(g.counts[name]??0)+1;};
       Daily.channels.forEach(c=>add(c.key,d.values[c.key]));

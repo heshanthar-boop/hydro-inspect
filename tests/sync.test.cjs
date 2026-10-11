@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');const vm=require('node:vm');const fs=
 (async()=>{
  let local=new Map(),remote=new Map(),reads=0,writes=0,scans=0;
  const user={uid:'visitor-1',isAnonymous:true};
- const db={enablePersistence:()=>Promise.resolve(),collection:()=>({get:()=>{scans++;throw Error('Unexpected history scan');},doc:id=>({id})}),runTransaction:async fn=>fn({get:async ref=>{reads++;return {exists:remote.has(ref.id),data:()=>structuredClone(remote.get(ref.id))};},set:(ref,value)=>{writes++;remote.set(ref.id,structuredClone(value));}})};
+ const db={enablePersistence:()=>Promise.resolve(),collection:()=>({get:()=>{scans++;throw Error('Unexpected history scan');},doc:id=>({id,get:async()=>({exists:remote.has(id),data:()=>structuredClone(remote.get(id))})})}),runTransaction:async fn=>fn({get:async ref=>{reads++;return {exists:remote.has(ref.id),data:()=>structuredClone(remote.get(ref.id))};},set:(ref,value)=>{writes++;remote.set(ref.id,structuredClone(value));}})};
  const firestore=()=>db;firestore.FieldValue={serverTimestamp:()=> 'SERVER_TIME'};
  const context=vm.createContext({console,navigator:{onLine:true},document:{getElementById:()=>null},firebase:{apps:[{}],auth:()=>({onAuthStateChanged:cb=>cb(user)}),firestore},App:{toast:()=>{}},Access:{isOwner:()=>false,actor:()=>({uid:user.uid,deviceId:'device-1'})},Store:{getDailyReadings:async()=>[...local.values()].map(r=>structuredClone(r)),saveDailyReading:async r=>local.set(r.id,structuredClone(r))}});
  vm.runInContext(fs.readFileSync('js/firebase-sync.js','utf8')+'\nglobalThis.Sync=FirebaseSync;',context);context.Sync.init();
