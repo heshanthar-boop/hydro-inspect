@@ -20,6 +20,7 @@ const Forms = {
       ? Calc.calculateKWhDiffs(inspection, this.previousInspection)
       : null;
     this.photos = await Store.getPhotosForInspection(inspection.id);
+    if(!container.isConnected)return;
     container.innerHTML = this.renderForm();
     if(!Access.isOwner()) {
       container.querySelectorAll('input,select,textarea').forEach(el=>el.disabled=true);

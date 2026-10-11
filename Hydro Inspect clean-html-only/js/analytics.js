@@ -9,6 +9,7 @@ const Analytics = {
     this.destroyCharts();
     await Calc.loadMeterConfig();
     const all = await Store.getInspections();
+    if(!container.isConnected)return;
     const plants = [...new Set(all.map(i => i.general.plantName))].sort();
     container.innerHTML = `<div class="page-intro"><span class="eyebrow">OPERATIONS INTELLIGENCE</span><h1>Performance & history</h1><p>Explore energy, equipment readings, and events across inspection periods.</p></div>
       <div class="analytics-filters"><label>Plant<select class="form-input" id="analytics-plant">${plants.map(p => `<option>${Forms.esc(p)}</option>`).join('')}</select></label>

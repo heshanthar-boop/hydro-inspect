@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.9.1',
+  VERSION: '2.9.2',
   currentPage: 'records',
   editingInspectionId: null,
 
@@ -13,7 +13,7 @@ const App = {
     await Calc.loadMeterConfig();
     this.bindNavigation();
     Access.updateUI();
-    this.navigate('records');
+    this.navigate(location.hash.slice(1) || 'records',{history:'replace'});
     this.registerServiceWorker();
 
     // Reflect real network state immediately, then listen for changes
@@ -27,7 +27,7 @@ const App = {
     FirebaseSync.init(async user => {
       Access.updateUI();
       if (!Access.isOwner() && ['new-inspection','settings'].includes(this.currentPage)) this.navigate('records');
-      if (user && navigator.onLine) { await FirebaseSync.syncAll(); this.navigate(this.currentPage); }
+      if (user && navigator.onLine) { await FirebaseSync.syncAll(); this.navigate(this.currentPage,{history:'none',refresh:true}); }
     });
   },
 
@@ -63,54 +63,87 @@ const App = {
       });
     });
 
+    window.addEventListener('popstate',event=>{this.editingInspectionId=event.state?.inspectionId || null;this.navigate(event.state?.page || location.hash.slice(1) || 'records',{history:'none'});});
+    document.addEventListener('keydown',event=>{
+      const sidebar=document.getElementById('sidebar');if(!sidebar.classList.contains('open'))return;
+      if(event.key==='Escape')this.toggleSidebar(false);
+      if(event.key==='Tab'){
+        const controls=[...sidebar.querySelectorAll('button,a')].filter(el=>el.offsetParent!==null);
+        const first=controls[0],last=controls[controls.length-1];
+        if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+        else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+      }
+    });
     document.querySelectorAll('.bottom-nav-item').forEach(item => {
       item.addEventListener('click', () => this.navigate(item.dataset.page));
     });
   },
 
   toggleSidebar(show) {
-    document.getElementById('sidebar').classList.toggle('open', show);
-    document.getElementById('sidebar-overlay').classList.toggle('show', show);
+    const sidebar=document.getElementById('sidebar');
+    sidebar.classList.toggle('open',show);document.getElementById('sidebar-overlay').classList.toggle('show',show);
+    document.getElementById('menu-btn').setAttribute('aria-expanded',String(show));
+    sidebar.setAttribute('aria-hidden',String(!show));sidebar.inert=!show;
+    document.body.classList.toggle('menu-is-open',show);
+    if(show) document.getElementById('close-menu').focus();
+    else document.getElementById('menu-btn').focus({preventScroll:true});
   },
 
-  navigate(page) {
-    if(['new-inspection','settings'].includes(page) && !Access.isOwner()) page='records';
-    if(MobileEntry.bar) MobileEntry.bar.hidden=true;
-    if (this.currentPage === 'new-inspection' && Forms.currentInspection && Forms._saveTimeout) {
-      clearTimeout(Forms._saveTimeout); Forms._saveTimeout = null;
-      Forms.flush?.();
-    }
-    if (this.currentPage === 'daily') { Daily.flush?.(); DailyCharts.destroy(); }
-    if (this.currentPage === 'analytics' && page !== 'analytics') Analytics.destroyCharts();
-    this.currentPage = page;
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
-    document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
-
-    const main = document.getElementById('main-content');
-    main.scrollTop = 0;
-    window.scrollTo(0, 0);
-
-    switch (page) {
-      case 'new-inspection': this.renderNewInspection(main); break;
-      case 'daily': Daily.render(main); break;
-      case 'view-inspection': this.renderNewInspection(main); break;
-      case 'records': this.renderRecords(main); break;
-      case 'analytics': Analytics.render(main); break;
-      case 'settings': this.renderSettings(main); break;
+  async navigate(page, options={}) {
+    const names={'records':'Inspection history','daily':'Daily meter readings','analytics':'Performance & history','new-inspection':'Inspection workspace','view-inspection':'Inspection record','settings':'Settings'};
+    if(!names[page])page='records';
+    if(['new-inspection','settings'].includes(page) && !Access.isOwner())page='records';
+    if(this._pageReady && page===this.currentPage && !options.refresh && !this.editingInspectionId){window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});return;}
+    const token=(this._navigationToken||0)+1;this._navigationToken=token;
+    this._scrollPositions=this._scrollPositions||{};
+    this._scrollPositions[this.currentPage]=window.scrollY;
+    const inspectionId=this.editingInspectionId;
+    if(MobileEntry.bar)MobileEntry.bar.hidden=true;
+    if(this.currentPage==='new-inspection' && Forms.currentInspection)await Forms.flush?.();
+    if(this.currentPage==='daily'){await Daily.flush?.();DailyCharts.destroy();}
+    if(token!==this._navigationToken)return;
+    Analytics.destroyCharts();this.currentPage=page;this._pageReady=false;
+    const activePage=page==='view-inspection'?'records':page;
+    document.querySelectorAll('.nav-item,.bottom-nav-item').forEach(item=>{const active=item.dataset.page===activePage;item.classList.toggle('active',active);if(active)item.setAttribute('aria-current','page');else item.removeAttribute('aria-current');});
+    document.title=names[page]+' · HydroInspect';
+    if(options.history!=='none')history[options.history==='replace'?'replaceState':'pushState']({page,inspectionId},'', '#'+page);
+    const main=document.getElementById('main-content');main.setAttribute('aria-busy','true');
+    const trail=document.createElement('div');trail.className='workspace-path';trail.textContent='Workspace / '+names[page];
+    const surface=document.createElement('div');surface.className='page-surface';
+    surface.innerHTML='<div class="navigation-loading" role="status"><span></span><p>Opening '+names[page].toLowerCase()+'…</p></div>';
+    main.replaceChildren(trail,surface);main.scrollTop=0;window.scrollTo(0,0);
+    try {
+      switch(page){
+        case 'new-inspection':case 'view-inspection':await this.renderNewInspection(surface,inspectionId);break;
+        case 'daily':await Daily.render(surface);break;
+        case 'records':await this.renderRecords(surface);break;
+        case 'analytics':await Analytics.render(surface);break;
+        case 'settings':await this.renderSettings(surface);break;
+      }
+      if(token!==this._navigationToken)return;
+      this._pageReady=true;surface.classList.add('page-ready');main.setAttribute('aria-busy','false');
+      main.tabIndex=-1;main.focus({preventScroll:true});
+      if(options.history==='none')window.scrollTo(0,this._scrollPositions[page]||0);
+    }catch(error){
+      if(token!==this._navigationToken)return;
+      surface.innerHTML='<div class="empty-state"><p>Unable to open this page.</p><button class="btn btn-primary" id="retry-page">Try again</button></div>';
+      surface.querySelector('#retry-page').addEventListener('click',()=>this.navigate(page,{refresh:true,history:'none'}));
+      main.setAttribute('aria-busy','false');this.toast(error.message,'error');
     }
   },
 
   // ===== New Inspection Page =====
-  async renderNewInspection(container) {
+  async renderNewInspection(container,inspectionId=this.editingInspectionId) {
     container.innerHTML = '<div class="loading-spinner">Loading...</div>';
     let inspection;
-    if (this.editingInspectionId) {
-      inspection = await Store.getInspection(this.editingInspectionId);
-      this.editingInspectionId = null;
+    if (inspectionId) {
+      inspection = await Store.getInspection(inspectionId);
+      if(this.editingInspectionId===inspectionId)this.editingInspectionId = null;
     }
     if (!inspection) {
       inspection = await Store.createBlankInspection();
     }
+    if(!container.isConnected)return;
     await Forms.init(inspection, container);
   },
 
@@ -125,6 +158,7 @@ const App = {
     container.innerHTML = '<div class="loading-spinner">Loading records...</div>';
     await Calc.loadMeterConfig();
     const inspections = await Store.getInspections();
+    if(!container.isConnected)return;
 
     if (inspections.length === 0) {
       container.innerHTML = `
@@ -279,6 +313,7 @@ const App = {
   async renderSettings(container) {
     const settings = await Store.getSettings();
     this._settingsInspections = await Store.getInspections();
+    if(!container.isConnected)return;
     this._meterDraft = (settings.meterChanges || []).map(mc => ({ ...mc }));
     container.innerHTML = `
       <div class="settings-group">
