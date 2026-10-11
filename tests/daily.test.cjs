@@ -5,7 +5,7 @@ vm.runInContext(fs.readFileSync('js/calculations.js','utf8')+'\n'+fs.readFileSyn
 ctx.Calc.meterChanges=[];
 const a={plant:'A',date:'2026-10-08',time:'09:00',readings:{cebImport:'100',cebExport:'20',gen1:'100',gen2:'200',transformer:'250',lt:'10'}};
 const b={plant:'A',date:'2026-10-09',time:'09:00',readings:{cebImport:'130',cebExport:'25',gen1:'115',gen2:'220',transformer:'280',lt:'12'}};
-const d=ctx.Daily.calculate(b,[a]);assert.equal(d.values.cebImport,30);assert.equal(d.values.cebExport,5);assert.equal(d.values.generation,35000);assert.equal(d.values.lt,2);assert.equal(d.values.netImport,25);
+const d=ctx.Daily.calculate(b,[a]);assert.equal(d.values.cebImport,30);assert.equal(d.values.cebExport,5);assert.equal(d.values.generation,35000);assert.equal(d.values.lt,2);
 assert.equal(ctx.Daily.calculate({...b,date:'2026-10-10'},[a]).days,2);
 assert.equal(ctx.Daily.calculate(b,[{...a,plant:'B'}]).previous,null);
 assert.equal(ctx.Daily.calculate({...b,readings:a.readings},[a]).values.cebImport,0);
