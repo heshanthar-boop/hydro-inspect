@@ -43,7 +43,7 @@ const Daily = {
       <div class="daily-save-bar"><span id="daily-auto-state" role="status">Ready for entry</span><span id="daily-progress">0 / 6 readings</span></div><p id="daily-existing" class="form-hint" role="status"></p><div class="form-row daily-meter-grid">${this.channels.map(ch=>`<div class="form-group"><label class="form-label">${ch.label} — cumulative</label><div class="input-with-unit"><input type="number" class="form-input" data-daily="${ch.key}" min="0" step="0.01" required placeholder="0.00"><span class="input-unit">kWh</span></div></div>`).join('')}</div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="daily-notes" placeholder="Meter change, outage, unusual reading…"></textarea></div>
       <div id="daily-preview"></div><button type="submit" class="btn btn-primary btn-block" id="daily-save">Finish daily entry</button><p class="form-hint">Changes save automatically on this device. Incomplete entries stay as drafts. Multiple readings per day are supported. Use New reading for the next meter visit. Times are plant local time (Sri Lanka). Visitor entries are traced to this browser.</p></form>
-      <div class="chart-container"><div class="flex-between"><h3>Record-to-record comparisons</h3><button type="button" class="btn btn-primary btn-sm" id="daily-new">New reading</button><button type="button" class="btn btn-outline btn-sm" id="daily-csv">Download CSV</button></div><div id="daily-history"></div></div>`;
+      <div class="chart-container"><div class="flex-between"><h3>Record-to-record comparisons</h3><button type="button" class="btn btn-primary btn-sm" id="daily-new">New reading</button><button type="button" class="btn btn-outline btn-sm" id="daily-csv">Download CSV</button></div><div id="daily-history"></div></div><div id="daily-charts"></div>`;
     const form=container.querySelector('#daily-form');
     let activeId='daily_'+crypto.randomUUID();
     const collect=()=>({id:activeId,plant:form.querySelector('#daily-plant').value.trim(),date:form.querySelector('#daily-date').value,time:form.querySelector('#daily-time').value,operator:form.querySelector('#daily-operator').value.trim(),notes:form.querySelector('#daily-notes').value,readings:Object.fromEntries([...form.querySelectorAll('[data-daily]')].map(el=>[el.dataset.daily,el.value]))});
@@ -72,6 +72,7 @@ const Daily = {
     const refresh=()=>{
       const r=collect();form.querySelector('#daily-progress').textContent=`${Object.values(r.readings).filter(v=>v!=='').length} / 6 readings`;container.querySelector('#daily-preview').innerHTML=this.summary(r,records);
       container.querySelector('#daily-history').innerHTML=this.history(records.filter(x=>x.plant===r.plant));
+      DailyCharts.update(container.querySelector('#daily-charts'),records,r.plant);
     };
     const load=()=>{
       clearTimeout(debounce);
