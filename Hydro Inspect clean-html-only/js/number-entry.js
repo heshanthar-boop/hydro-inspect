@@ -10,7 +10,7 @@ const NumberEntry = {
       input.inputMode = step === 'any' || Number(step) < 1 ? 'decimal' : 'numeric';
       input.addEventListener('wheel', () => { if(document.activeElement === input) input.blur(); });
       const tools = document.createElement('div'); tools.className = 'number-entry-tools';
-      const add = (label, aria, action) => { const b=document.createElement('button'); b.type='button'; b.className='number-entry-btn'; b.textContent=label; b.setAttribute('aria-label',aria); b.disabled=input.disabled || input.readOnly; b.addEventListener('click',action); tools.append(b); };
+      const add = (label, aria, action) => { const b=document.createElement('button'); b.type='button'; b.className='number-entry-btn'; b.textContent=label; b.setAttribute('aria-label',aria); b.disabled=input.disabled || input.readOnly; b.addEventListener('pointerdown',event=>event.preventDefault()); b.addEventListener('click',action); tools.append(b); };
       add('−','Decrease '+this.label(input),()=>this.adjust(input,-1));
       add('+','Increase '+this.label(input),()=>this.adjust(input,1));
       add('Keypad','Open keypad for '+this.label(input),()=>this.open(input));
