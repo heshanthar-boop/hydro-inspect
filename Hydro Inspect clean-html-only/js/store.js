@@ -5,7 +5,7 @@
  */
 const Store = {
   DB_NAME: 'hydroinspect',
-  DB_VERSION: 3,
+  DB_VERSION: 4,
   db: null,
 
   defaultSettings: {
@@ -30,6 +30,14 @@ const Store = {
     ],
   },
 
+  normalizeUnits(record, kind) {
+    if(record._deleted)return record;
+    const units=kind==='dailyReadings' ? {cebImport:'kWh',cebExport:'kWh',gen1:'MWh',gen2:'MWh',transformer:'MWh',lt:'kWh'} : {transformerPanel:'MWh',gen1Panel:'MWh',gen2Panel:'MWh',cebLVPanel:'kWh'};
+    record[kind==='dailyReadings'?'units':'meterUnits']=units;
+    record.unitSchemaVersion=1;
+    return record;
+  },
+
   // Open (or upgrade) the database
   async open() {
     if (this.db) return this.db;
@@ -50,6 +58,10 @@ const Store = {
         if (!db.objectStoreNames.contains('dailyReadings')) db.createObjectStore('dailyReadings', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        for(const kind of ['inspections','dailyReadings']){
+          const cursor=e.target.transaction.objectStore(kind).openCursor();
+          cursor.onsuccess=()=>{const item=cursor.result;if(!item)return;if(!item.value._deleted)item.update(this.normalizeUnits(item.value,kind));item.continue();};
         }
       };
 
@@ -90,6 +102,7 @@ const Store = {
   },
 
   async saveInspection(inspection, opts) {
+    this.normalizeUnits(inspection,'inspections');
     const silent = opts && opts.silent;
     if(!silent && !Access.isOwner()) throw new Error('Only the owner can edit inspections');
     if(!silent && !inspection._deleted && (await this.getInspection(inspection.id))?._deleted) throw new Error('This inspection has been deleted');
@@ -487,6 +500,7 @@ const Store = {
   },
 
   async saveDailyReading(record, opts = {}) {
+    this.normalizeUnits(record,'dailyReadings');
     const db=await this.open();
     if(!opts.silent) {
       const existing=(await this.getDailyReadings()).find(r=>r.id===record.id);
@@ -515,7 +529,7 @@ const Store = {
       dailyReadings: await this.getDailyReadings(),
       settings,
       exportedAt: new Date().toISOString(),
-      version: 3,
+      version: 4,
     }, null, 2);
   },
 
