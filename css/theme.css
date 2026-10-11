@@ -175,3 +175,50 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 .meter-comparison-chart { grid-column:1/-1; }
 .chart-scroll { max-width:100%;overflow-x:auto;overscroll-behavior-x:contain; }
 .meter-comparison-chart .daily-chart-frame { height:370px; }
+
+/* Record workspace: summaries first, detailed tables on demand. */
+.daily-section-nav { display:flex;gap:8px;padding:6px;border:1px solid #d7e5ec;border-radius:14px;background:#ffffffc9;margin-bottom:18px; }
+.daily-section-nav button { flex:1;min-height:44px;border:0;border-radius:10px;background:transparent;color:#36596d;font-size:14px;font-weight:650;cursor:pointer; }
+.daily-section-nav button:hover,.daily-section-nav button:focus-visible { background:#e7f3f1;color:#076e74; }
+.daily-overview-grid { display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:20px; }
+.daily-overview-grid>div { border:1px solid #dbe6ee;border-radius:16px;background:#fff;padding:20px; }
+.daily-overview-grid span { display:block;font-size:12px;color:#526b80;margin-bottom:8px; }
+.daily-overview-grid strong { display:block;font-size:23px;color:#173d51;font-variant-numeric:tabular-nums; }
+.daily-overview-grid small { display:block;font-size:12px;color:#58758a;margin-top:6px; }
+.daily-record-grid,.inspection-record-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px; }
+.daily-record-card { border:1px solid #d9e6ee;border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 5px 18px #12364d06; }
+.daily-record-card header { display:flex;justify-content:space-between;align-items:start;gap:12px;padding:20px;background:linear-gradient(110deg,#f8fcfd,#f0f7fa);border-bottom:1px solid #e4edf3; }
+.record-card-date { font-size:12px;font-weight:700;color:#41667c; }
+.daily-record-card h3 { color:#163e52;margin:4px 0;font-size:25px;letter-spacing:-.5px; }
+.daily-record-card h3 small { display:block;font-size:11px;font-weight:500;color:#627e8e;letter-spacing:0;margin-top:3px; }
+.daily-record-card header p { font-size:14px;color:#41647a; }
+.record-status { padding:6px 10px;border-radius:8px;font-size:11px;font-weight:750;white-space:nowrap; }
+.record-status.is-complete { color:#0c695b;background:#dff3ec;border:1px solid #c3e6db; }
+.record-status.is-draft { color:#845716;background:#fff1d8;border:1px solid #ecd7ab; }
+.record-status.is-review { color:#a13728;background:#ffebe6;border:1px solid #efcfc7; }
+.reading-value-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:20px; }
+.reading-value-grid>div { min-width:0; }
+.reading-value-grid span { display:block;font-size:12px;color:#506e82;line-height:1.5; }
+.reading-value-grid strong { display:block;font-size:21px;color:#163e52;letter-spacing:-.3px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;margin-top:4px; }
+.reading-value-grid strong small { font-size:12px;color:#476d82;font-weight:650; }
+.record-period-strip { margin:0 20px 18px;padding:12px;background:#edf7f5;border:1px solid #d5e9e4;border-radius:11px; }
+.record-period-strip span { display:block;font-size:11px;line-height:1.6;color:#496f78; }
+.record-period-strip p { font-size:12px;line-height:1.8;color:#345e67;margin-top:5px; }
+.daily-record-card>.form-hint,.record-note,.draft-notice,.daily-record-card>.text-danger { margin:0 20px 16px; }
+.record-note { font-size:14px;color:#425e71;white-space:pre-wrap; }
+.draft-notice { padding:12px;border-radius:10px;background:#fff7e7;color:#80571e;font-size:13px; }
+.daily-record-card footer { padding:16px 20px;border-top:1px solid #e4edf3;display:flex;gap:10px; }
+.record-table-library { margin-top:22px; }
+.record-details { border:1px solid #dce7ee;border-radius:13px;margin:10px 0;background:#f9fcfd;overflow:hidden; }
+.record-details summary { cursor:pointer;font-size:14px;font-weight:700;padding:18px;color:#345d74; }
+.record-details summary span { float:right;font-size:12px;font-weight:500;color:#5d788a; }
+.record-details>div { padding:0 16px 18px;background:white; }
+#daily-form,#daily-history,#daily-charts { scroll-margin-top:95px; }
+.inspection-record-grid .record-card { margin-bottom:0;min-width:0; }
+@media(max-width:700px) { .daily-record-grid,.inspection-record-grid { grid-template-columns:1fr; } .daily-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .daily-overview-grid>div:first-child { grid-column:1/-1; } .daily-overview-grid strong { font-size:22px; } .daily-overview-grid span,.daily-overview-grid small { font-size:13px; } .reading-value-grid span { font-size:14px; } .reading-value-grid strong { font-size:22px; } .reading-value-grid strong small { font-size:14px; } .record-period-strip p { font-size:14px; } .record-period-strip span { font-size:12px; } .record-status { font-size:12px; } .daily-section-nav button { font-size:13px; } .record-details summary span { display:none; } }
+@media(max-width:360px) { .reading-value-grid { grid-template-columns:1fr; } }
+
+#daily-history-section { scroll-margin-top:95px; }
+.record-history-heading { flex-wrap:wrap;gap:12px;margin-bottom:18px; }
+.record-history-heading h3 { margin-bottom:0; }
+@media(max-width:650px) { .record-history-heading h3 { flex:1 0 100%; } .record-history-heading button { flex:1; } }
