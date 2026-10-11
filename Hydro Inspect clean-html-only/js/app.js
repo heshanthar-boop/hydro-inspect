@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.9.9',
+  VERSION: '2.9.10',
   currentPage: 'records',
   editingInspectionId: null,
 
