@@ -18,7 +18,7 @@ const NumberEntry = {
       anchor.insertAdjacentElement('afterend',tools);
       const preview=document.createElement('div');preview.className='number-value-preview';tools.insertAdjacentElement('afterend',preview);
       const updatePreview=()=>{const raw=input.value;preview.hidden=raw==='';const parts=raw.split('.');const grouped=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',')+(parts.length>1?'.'+parts[1]:'');const unit=anchor.querySelector?.('.input-unit')?.textContent || '';preview.textContent='Entered: '+grouped+(unit?' '+unit:'');};
-      input.addEventListener('input',updatePreview);input.addEventListener('change',updatePreview);updatePreview();
+      input.refreshNumberPreview=updatePreview;input.addEventListener('input',updatePreview);input.addEventListener('change',updatePreview);updatePreview();
     });
   },
   label(input) {
