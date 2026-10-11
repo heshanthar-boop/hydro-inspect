@@ -51,6 +51,7 @@ const Forms = {
     const prevLabel = prevDate ? `<span class="form-hint">Previous visit: ${prevDate}</span>` : '';
 
     return `
+<div class="page-intro"><span class="eyebrow">ELECTRICAL INSPECTION</span><h1>Inspection workspace</h1><p>${this.esc(insp.general.plantName)} · ${Calc.formatDateFull(insp.general.date)}</p></div>
       ${this.renderSessionInfo(insp)}
       ${this.renderGeneralInfo(insp)}
       ${this.renderOperatorStatement(insp)}
