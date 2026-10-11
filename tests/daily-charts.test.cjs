@@ -6,4 +6,5 @@ const days=ctx.C.aggregate(rows,'day');assert.equal(days.length,2);assert.equal(
 assert.equal(ctx.C.bucket('2026-10-04','week'),'2026-09-28');const weeks=ctx.C.aggregate(rows,'week');assert.equal(weeks.length,1);assert.equal(weeks[0].values.cebImport,300);assert.equal(ctx.C.aggregate(rows,'month')[0].values.lt,15);assert.equal(ctx.C.aggregate(rows,'year')[0].values.gen1,120000);
 assert.equal(ctx.C.aggregate([rows[0],{...rows[1],draft:true}],'day').length,0);
 const bad={...rows[1],readings:{...rows[1].readings,transformer:'-1'}};const invalid=ctx.C.aggregate([rows[0],bad],'day')[0];assert.equal(invalid.values.importDeviation,undefined);assert.equal(invalid.values.cebImport,100);
+assert.equal(days[0].start,'2026-10-04T09:00');assert.equal(days[0].end,'2026-10-05T12:00');assert.equal(weeks[0].start,'2026-10-04T09:00');assert.equal(weeks[0].end,'2026-10-07T12:00');assert.equal(days[0].ranges.cebImport.start,days[0].start);
 console.log('Chart grouping, interval totals, deviations, draft and coverage checks passed');

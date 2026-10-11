@@ -165,3 +165,9 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 .daily-reference strong { overflow-wrap:anywhere; }
 
 #daily-operator:disabled { color:#075e62;background:#edf7f6;opacity:1; }
+
+.chart-time-span { padding:10px 12px;border:1px solid #d9e7ef;background:#f3f8fb;border-radius:10px;color:#31566d;font-size:13px;line-height:1.7;margin-bottom:14px;font-variant-numeric:tabular-nums; }
+.chart-time-span strong { display:inline-block;min-width:42px; }
+.chart-time-span span { color:#536e82; }
+.daily-chart-frame { height:320px; }
+@media(max-width:650px) { .chart-time-span { font-size:14px; } .daily-chart-frame { height:300px; } }
