@@ -377,8 +377,7 @@ const FirebaseSync = (() => {
       if(!record.audit && Access.isOwner()) {const actor=Access.actor();record.audit={created:actor,lastEdited:actor};}
       const editable=Access.isOwner() || record.audit?.created?.uid===_user.uid;
       if(editable && (!r || _newerSide(record,r)==='local')) {
-        await col.doc(record.id).set({...record,_pendingSync:false,_shared:true,_serverEditedAt:firebase.firestore.FieldValue.serverTimestamp()});
-        await Store.saveDailyReading({...record,_pendingSync:false},{silent:true});
+        await pushDailyReading(record);
       } else if(r && (_newerSide(record,r)==='remote' || record._pendingSync || !editable)) await Store.saveDailyReading({...r,_shared:true,_pendingSync:false},{silent:true});
     }
     for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_shared:true,_pendingSync:false},{silent:true});
@@ -399,12 +398,17 @@ const FirebaseSync = (() => {
       const snapshot=await tx.get(ref),remote=snapshot.exists ? snapshot.data() : null;
       if(remote && _newerSide(clean,remote)==='remote') return remote;
       if(remote) clean.audit.created=remote.audit.created;
+      if(owner && remote?.readingAt && clean.date===remote.date && clean.time===remote.time) clean.readingAt=remote.readingAt;
+      if(!owner) clean.readingAt=remote && !remote.draft && remote.readingAt ? remote.readingAt : firebase.firestore.FieldValue.serverTimestamp();
       tx.set(ref,{...clean,_pendingSync:false,_shared:true,_serverEditedAt:firebase.firestore.FieldValue.serverTimestamp()});
       return {...clean,_pendingSync:false,_shared:true};
     });
     // Never replace a newer local edit with the result of an older upload.
     const current=(await Store.getDailyReadings()).find(r=>r.id===clean.id);
-    if(current && current.updatedAt===record.updatedAt) await Store.saveDailyReading(result,{silent:true});
+    if(current && current.updatedAt===record.updatedAt) {
+      const acknowledged=await ref.get();
+      if(acknowledged.exists) await Store.saveDailyReading({...acknowledged.data(),_pendingSync:false,_shared:true},{silent:true});
+    }
   }
 
   function onDailyReadingSaved(record) {

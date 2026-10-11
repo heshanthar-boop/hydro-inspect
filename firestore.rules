@@ -30,10 +30,12 @@ match /hydro_workspaces/main/hydro_daily_readings/{id} {
   }
   allow read: if true;
   allow create: if request.auth != null && validReading()
-    && request.resource.data.audit.created.uid == request.auth.uid;
+    && request.resource.data.audit.created.uid == request.auth.uid
+    && (hydroOwner() || request.resource.data.readingAt == request.time);
   allow update: if request.auth != null && validReading()
     && (hydroOwner() || resource.data.audit.created.uid == request.auth.uid)
-    && request.resource.data.audit.created == resource.data.audit.created;
+    && request.resource.data.audit.created == resource.data.audit.created
+    && (hydroOwner() || ((resource.data.draft || !resource.data.keys().hasAny(['readingAt'])) ? request.resource.data.readingAt == request.time : request.resource.data.readingAt == resource.data.readingAt));
   allow delete: if hydroOwner();
 }
 
