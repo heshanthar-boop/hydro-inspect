@@ -152,3 +152,14 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 .menu-is-open { overflow:hidden; }
 .sidebar-header h2 { font-size:16px;letter-spacing:-.3px; }
 @media(prefers-reduced-motion:reduce) { .page-ready,.navigation-loading span { animation:none; } }
+
+.daily-reference { background:#eef6fa;border:1px solid #d9e7ef;border-radius:10px;padding:10px 12px;margin:0 0 10px;color:#31566d; }
+.daily-reference>div { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px; }
+.daily-reference span { font-size:12px; }
+.daily-reference strong { font-size:16px;color:#183f56;font-variant-numeric:tabular-nums; }
+.daily-reference small { display:block;font-size:12px;margin-top:3px; }
+.daily-reference p { margin:6px 0 0;font-size:13px;font-weight:650; }
+.daily-reference.reading-review { background:#fff3ed;border-color:#edc8b7;color:#8a391b; }
+@media(max-width:650px) { .daily-reference span,.daily-reference small,.daily-reference p { font-size:14px; } .daily-reference strong { font-size:18px; } }
+
+.daily-reference strong { overflow-wrap:anywhere; }
