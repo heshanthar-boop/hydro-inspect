@@ -82,6 +82,7 @@ const Daily = {
       clearTimeout(debounce);
       const r=collect(),existing=records.find(x=>x.id===activeId);
       form.querySelectorAll('[data-daily]').forEach(el=>el.value=existing?.readings[el.dataset.daily] ?? '');
+      form.querySelectorAll('[data-daily]').forEach(el=>el.refreshNumberPreview?.());
       form.querySelector('#daily-time').value=existing?.time || DateEntry.localTime();
       form.querySelector('#daily-notes').value=existing?.notes || '';
       const operator=form.querySelector('#daily-operator');

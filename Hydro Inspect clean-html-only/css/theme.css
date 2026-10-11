@@ -86,3 +86,49 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 @media(max-width:360px) { .brand-mark { display:none; } .header-title { font-size:15px; } .main-content { padding-left:10px;padding-right:10px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important;transition:none !important;animation:none !important; } }
 @media print { body { background:#fff; } .brand-mark,.mobile-entry-bar { display:none !important; } .page-intro { background:#fff;color:#16273b;box-shadow:none; } .page-intro p { color:#52667c; } }
+
+/* Phone legibility: keep readings prominent and instructions readable. */
+@media(max-width:650px) {
+  body { font-size:16px;line-height:1.6;letter-spacing:0; }
+  .form-label { font-size:15px;font-weight:700;color:#243f55;line-height:1.45;margin-bottom:10px; }
+  .form-input,.form-select,.form-textarea { font-size:18px !important;min-height:54px;padding:13px 12px;line-height:1.4;color:#102f45; }
+  input[type=number].form-input { font-size:22px !important;font-weight:650;letter-spacing:.2px;font-variant-numeric:tabular-nums; }
+  .form-input::placeholder,.form-textarea::placeholder { color:#526b7f;opacity:1;font-weight:400; }
+  .input-unit { font-size:14px;color:#294b62;padding:0 10px;min-width:50px;display:flex;align-items:center;justify-content:center;white-space:nowrap; }
+  .form-hint,.text-sm,.text-muted.text-sm { font-size:14px;line-height:1.6;color:#435e73; }
+  .page-intro p { font-size:15px;line-height:1.65; }
+  .eyebrow { font-size:12px !important; }
+  .card-header h3,.chart-container h3 { font-size:17px;line-height:1.45; }
+  .section-title,.chart-container h4 { font-size:14px;letter-spacing:.3px;line-height:1.5; }
+  .form-group { margin-bottom:20px; }
+  .daily-meter-grid { gap:6px; }
+  .stat-value { font-size:30px;line-height:1.25;overflow-wrap:anywhere; }
+  .stat-label,.record-stat-label { font-size:13px;line-height:1.45; }
+  .stat-sublabel { font-size:13px; }
+  .record-stat-value { font-size:20px;overflow-wrap:anywhere; }
+  .history-table { font-size:16px; }
+  .history-table th { font-size:13px;letter-spacing:.2px; }
+  .history-table td,.history-table th { padding:16px 14px; }
+  .history-table small { display:block; }
+  .date-entry-btn,.number-entry-btn,.number-entry-btn:last-child { font-size:14px;min-height:44px;padding:9px 12px; }
+  .btn,.btn-sm { font-size:15px;min-height:46px; }
+  .daily-save-bar { font-size:14px;flex-wrap:wrap; }
+  .inspection-nav label,#inspection-save-state { font-size:14px; }
+  .number-entry-heading h2 { font-size:19px;line-height:1.4; }
+  #number-entry-value { font-size:34px; }
+  .number-key-grid button { font-size:25px;min-height:54px; }
+  .number-entry-hint { font-size:13px; }
+  .mobile-entry-bar>span { font-size:13px;line-height:1.45; }
+  .mobile-entry-bar button { font-size:16px;min-height:46px; }
+  .bottom-nav-item { font-size:12px;min-width:0;padding:5px 8px; }
+  .record-stats { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }
+  .battery-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:380px) {
+  .form-row { grid-template-columns:1fr; }
+  .daily-summary .stat-grid { grid-template-columns:1fr; }
+  .battery-grid { grid-template-columns:1fr; }
+}
+
+.number-value-preview { margin:8px 0 0;color:#244c60;font-size:13px;font-weight:650;overflow-wrap:anywhere;font-variant-numeric:tabular-nums; }
+@media(max-width:650px) { .number-value-preview { font-size:15px;line-height:1.5; } }
