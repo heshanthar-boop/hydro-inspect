@@ -9,7 +9,7 @@ const Reports = {
     const previous = await Store.getPreviousInspection(inspection.general.date, inspection.general.plantName);
     const diffs = previous ? Calc.calculateKWhDiffs(inspection, previous) : null;
     const esc = value => Forms.esc(String(value ?? ''));
-    const title = key => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+    const title = key => ({transformerPanelKWh:'Transformer panel (MWh)',gen1PanelKWh:'No.1 panel (MWh)',gen2PanelKWh:'No.2 panel (MWh)',cebLVPanelKWh:'LT panel (kWh)'})[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
     const render = value => {
       if (Array.isArray(value)) return value.length ? value.map(item => `<div class="item">${render(item)}</div>`).join('') : '<p>No entries recorded</p>';
       if (value && typeof value === 'object') return `<table>${Object.entries(value).filter(([key]) => !key.startsWith('_') && !['id','photoIds'].includes(key)).map(([key,v]) => `<tr><th>${esc(title(key))}</th><td>${render(v)}</td></tr>`).join('')}</table>`;
@@ -78,7 +78,7 @@ const Reports = {
       y += 5;
     };
 
-    const addRowWithDiff = (label, value, diff, unit = 'kWh') => {
+    const addRowWithDiff = (label, value, diff, unit = 'kWh', diffUnit = unit) => {
       checkPage(6);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
@@ -94,7 +94,7 @@ const Reports = {
         doc.setFontSize(7.5);
         if (diff >= 0) doc.setTextColor(22, 163, 74);
         else doc.setTextColor(220, 38, 38);
-        doc.text(`(${sign}${Calc.formatNumber(diff)} ${unit})`, margin + 130, y);
+        doc.text(`(${sign}${Calc.formatNumber(diff)} ${diffUnit})`, margin + 130, y);
         doc.setTextColor(0, 0, 0);
       }
       y += 5;
@@ -209,7 +209,7 @@ const Reports = {
     const pa = diffs?.powerAnalyzers || {};
     const paMeters = diffs?.analyzerMeters || {};
     Calc.METER_CHANNELS.forEach(ch => {
-      addRowWithDiff(ch.label, Calc._valueAt(inspection, ch.path), pa[ch.key]);
+      addRowWithDiff(ch.label, Calc._valueAt(inspection, ch.path), pa[ch.key],ch.unit,'kWh');
       // Explain any bridged difference so the figure can be checked against the meters
       const detail = paMeters[ch.key];
       const crossed = detail?.changes || [];
@@ -217,8 +217,8 @@ const Reports = {
         const change = crossed[crossed.length - 1];
         const prevReading = prev ? Calc._num(Calc._valueAt(prev, ch.path)) : null;
         addNote(`Meter replaced after ${Calc.formatDateFull(change.date)}: old closed at `
-          + `${Calc.formatNumber(Calc.oldFinalOf(change, prevReading))} kWh, new started at `
-          + `${Calc.formatNumber(Calc.newStartOf(change))} kWh. Difference bridged `
+          + `${Calc.formatNumber(Calc.oldFinalOf(change, prevReading))} ${ch.unit}, new started at `
+          + `${Calc.formatNumber(Calc.newStartOf(change))} ${ch.unit}. Difference bridged `
           + `(${Calc.formatNumber(detail.oldRun)} old + ${Calc.formatNumber(detail.newRun)} new).`);
       }
     });
@@ -473,9 +473,9 @@ const Reports = {
     body += `R1: ${Calc.formatNumber(inspection.cebMeter.importedR1)} kWh\n\n`;
 
     body += `--- Power Analyzers ---\n`;
-    body += `Transformer Panel: ${Calc.formatNumber(inspection.powerAnalyzers.transformerPanelKWh)} kWh\n`;
-    body += `Gen 1 Panel: ${Calc.formatNumber(inspection.powerAnalyzers.gen1PanelKWh)} kWh\n`;
-    body += `Gen 2 Panel: ${Calc.formatNumber(inspection.powerAnalyzers.gen2PanelKWh)} kWh\n\n`;
+    body += `Transformer Panel: ${Calc.formatNumber(inspection.powerAnalyzers.transformerPanelKWh)} MWh\n`;
+    body += `Gen 1 Panel: ${Calc.formatNumber(inspection.powerAnalyzers.gen1PanelKWh)} MWh\n`;
+    body += `Gen 2 Panel: ${Calc.formatNumber(inspection.powerAnalyzers.gen2PanelKWh)} MWh\n\n`;
 
     body += `--- Generator Hours ---\n`;
     body += `Gen 1: ${Calc.formatNumber(inspection.generators.gen1.runningHoursOnline)} hrs (limit: ${inspection.generators.gen1.runningHourLimit || '-'})\n`;

@@ -53,7 +53,7 @@ const NumberEntry = {
     this.activeInput=input; this.draft=input.value;
     this.dialog.querySelector('#number-entry-label').textContent=this.label(input);
     const previous=input.dataset.daily ? input.dataset.previousValue : input.dataset.field && Forms.previousInspection ? Calc._valueAt(Forms.previousInspection,input.dataset.field) : null;
-    this.dialog.querySelector('#number-entry-previous').textContent=previous != null && previous !== '' ? `Previous reading: ${Calc.formatNumber(previous)}${input.dataset.previousInfo?' · '+input.dataset.previousInfo:''}` : '';
+    this.dialog.querySelector('#number-entry-previous').textContent=previous != null && previous !== '' ? `Previous reading: ${Calc.formatNumber(previous)} ${input.dataset.previousUnit || input.closest('.input-with-unit')?.querySelector('.input-unit')?.textContent || ''}${input.dataset.previousInfo?' · '+input.dataset.previousInfo:''}` : '';
     this.message(''); this.display();
     if(!this.dialog.open) this.dialog.showModal();
     this.dialog.querySelector('[data-key="1"]').focus();
