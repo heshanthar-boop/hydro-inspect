@@ -216,10 +216,13 @@ const FirebaseSync = (() => {
       const clean = _stripPhotos(inspection);
       // Don't ship internal queue flag to Firestore
       delete clean._pendingSync;
-      await col.doc(String(inspection.id)).set({
-        ...clean,
-        _syncedAt: firebase.firestore.FieldValue.serverTimestamp()
+      const ref=col.doc(String(inspection.id));
+      const deleted=await _db.runTransaction(async tx=>{
+        const snapshot=await tx.get(ref);const remote=snapshot.exists?snapshot.data():null;
+        if(remote?._deleted && !clean._deleted)return remote;
+        tx.set(ref,{...clean,_syncedAt:firebase.firestore.FieldValue.serverTimestamp()});return null;
       });
+      if(deleted) {await Store.saveInspection(deleted,{silent:true});return true;}
       // Clear the pending flag locally so the UI can show "synced"
       if (typeof Store !== 'undefined' && Store.markSynced) {
         try { await Store.markSynced(inspection.id); } catch (_) {}
@@ -295,7 +298,7 @@ const FirebaseSync = (() => {
         return;
       }
 
-      const local = await Store.getInspections();
+      const local = await Store.getInspections({includeDeleted:true});
       const localById = new Map(local.map(i => [String(i.id), i]));
 
       let pushed = 0, pulled = 0, failed = 0, skipped = 0, conflicts = 0;
@@ -324,7 +327,7 @@ const FirebaseSync = (() => {
       for (const [id, data] of Object.entries(remote)) {
         const localRec = localById.get(String(id));
         const newer = _newerSide(localRec, data);
-        if (!localRec || newer === 'remote') {
+        if (!localRec || newer === 'remote' || data._deleted) {
           // Strip Firestore internal field. Save silently so the auto-sync hook
           // doesn't bounce the record straight back to Firebase.
           delete data._syncedAt;

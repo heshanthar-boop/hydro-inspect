@@ -64,13 +64,13 @@ const Store = {
 
   // ===== Inspection CRUD =====
 
-  async getInspections() {
+  async getInspections(opts = {}) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction('inspections', 'readonly');
       const req = tx.objectStore('inspections').getAll();
       req.onsuccess = () => {
-        const results = (req.result || []).sort(
+        const results = (req.result || []).filter(r=>opts.includeDeleted || !r._deleted).sort(
           (a, b) => new Date(b.general.date) - new Date(a.general.date)
         );
         resolve(results);
@@ -92,6 +92,7 @@ const Store = {
   async saveInspection(inspection, opts) {
     const silent = opts && opts.silent;
     if(!silent && !Access.isOwner()) throw new Error('Only the owner can edit inspections');
+    if(!silent && !inspection._deleted && (await this.getInspection(inspection.id))?._deleted) throw new Error('This inspection has been deleted');
     const db = await this.open();
     // Preserve the record's own updatedAt when saving silently (e.g. from a cloud pull)
     if (!silent) {
@@ -134,16 +135,11 @@ const Store = {
   },
 
   async deleteInspection(id) {
-    if(!Access.isOwner()) throw new Error('Only the owner can delete inspections');
-    const db = await this.open();
-    // Also delete all photos for this inspection
+    if(!Access.isOwner())throw new Error('Only the owner can delete inspections');
+    const record=await this.getInspection(id);if(!record)return;
+    // Keep a small deletion marker so offline devices cannot restore the record.
+    await this.saveInspection({id:record.id,general:record.general,_deleted:true,deletedAt:new Date().toISOString()});
     await this.deletePhotosForInspection(id);
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('inspections', 'readwrite');
-      const req = tx.objectStore('inspections').delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
   },
 
   async getPreviousInspection(currentDate, plantName) {
