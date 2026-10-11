@@ -24,11 +24,13 @@ const Calc = {
   // Each swap is recorded in settings and the period consumption is bridged across the
   // old and new counters instead.
 
+  // Legacy *KWh property names remain unchanged; stored readings use each meter's native unit.
+  // Comparison outputs are normalized to kWh; replacement closing/start values stay native.
   METER_CHANNELS: [
-    { key: 'transformerPanel', path: 'powerAnalyzers.transformerPanelKWh', label: 'Transformer Panel (Total)' },
-    { key: 'gen1Panel',        path: 'powerAnalyzers.gen1PanelKWh',        label: 'No.1 Generator Panel' },
-    { key: 'gen2Panel',        path: 'powerAnalyzers.gen2PanelKWh',        label: 'No.2 Generator Panel' },
-    { key: 'cebLVPanel',       path: 'powerAnalyzers.cebLVPanelKWh',       label: 'CEB LV Panel' },
+    { key: 'transformerPanel', path: 'powerAnalyzers.transformerPanelKWh', label: 'Transformer Panel (Total)', unit: 'MWh', factor: 1000 },
+    { key: 'gen1Panel',        path: 'powerAnalyzers.gen1PanelKWh',        label: 'No.1 Generator Panel', unit: 'MWh', factor: 1000 },
+    { key: 'gen2Panel',        path: 'powerAnalyzers.gen2PanelKWh',        label: 'No.2 Generator Panel', unit: 'MWh', factor: 1000 },
+    { key: 'cebLVPanel',       path: 'powerAnalyzers.cebLVPanelKWh',       label: 'CEB LV Panel', unit: 'kWh', factor: 1 },
   ],
 
   meterChanges: [],
@@ -168,7 +170,7 @@ const Calc = {
         this._valueAt(previous, ch.path),
         currDate, prevDate
       );
-      analyzers[ch.key] = r.value;
+      analyzers[ch.key] = r.value===null ? null : Math.round(r.value*ch.factor*1e8)/1e8;
       analyzerMeters[ch.key] = r;
     });
 
@@ -255,9 +257,9 @@ const Calc = {
       labels.push(this.formatDateShort(insp.general.date));
       cebImported.push(this._num(insp.cebMeter.importedTotal));
       const date = insp.general.date;
-      gen1.push(this.normalizedReading('gen1Panel', insp.powerAnalyzers.gen1PanelKWh, date));
-      gen2.push(this.normalizedReading('gen2Panel', insp.powerAnalyzers.gen2PanelKWh, date));
-      transformer.push(this.normalizedReading('transformerPanel', insp.powerAnalyzers.transformerPanelKWh, date));
+      gen1.push(this.normalizedReading('gen1Panel', insp.powerAnalyzers.gen1PanelKWh, date)===null?null:this.normalizedReading('gen1Panel', insp.powerAnalyzers.gen1PanelKWh, date)*1000);
+      gen2.push(this.normalizedReading('gen2Panel', insp.powerAnalyzers.gen2PanelKWh, date)===null?null:this.normalizedReading('gen2Panel', insp.powerAnalyzers.gen2PanelKWh, date)*1000);
+      transformer.push(this.normalizedReading('transformerPanel', insp.powerAnalyzers.transformerPanelKWh, date)===null?null:this.normalizedReading('transformerPanel', insp.powerAnalyzers.transformerPanelKWh, date)*1000);
     });
 
     return { labels, cebImported, gen1, gen2, transformer };

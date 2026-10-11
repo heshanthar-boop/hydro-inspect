@@ -358,6 +358,7 @@ const Forms = {
 
   // One analyzer reading, with the period difference bridged across any meter swap
   renderAnalyzerField(insp, prev, diffs, key, label, path) {
+    const unit=Calc.channelMeta(key).unit;
     const value = Calc._valueAt(insp, path) ?? '';
     const d = diffs?.powerAnalyzers?.[key];
     const detail = diffs?.analyzerMeters?.[key];
@@ -376,9 +377,9 @@ const Forms = {
       note = `
         <div class="meter-change-note">
           <strong>Meter replaced after ${Calc.formatDateFull(change.date)} reading.</strong>
-          Old meter closed at ${Calc.formatNumber(closing)} kWh; new meter started at ${Calc.formatNumber(Calc.newStartOf(change))} kWh.
+          Old meter closed at ${Calc.formatNumber(closing)} ${unit}; new meter started at ${Calc.formatNumber(Calc.newStartOf(change))} ${unit}.
           <br>Period consumption bridged: ${Calc.formatNumber(detail.oldRun)} (old) + ${Calc.formatNumber(detail.newRun)} (new)
-          = <strong>${Calc.formatNumber(detail.value)} kWh</strong>
+          = <strong>${Calc.formatNumber(detail.value)} ${unit}</strong>
         </div>`;
     } else if (typeof d === 'number' && d < 0) {
       note = `
@@ -391,7 +392,7 @@ const Forms = {
     return `
       <div class="form-group">
         <label class="form-label">${label} ${Calc.diffBadgeHTML(d)} ${chip}</label>
-        <div class="input-with-unit"><input type="number" class="form-input" data-field="${path}" value="${value}" step="0.01"><span class="input-unit">kWh</span></div>
+        <div class="input-with-unit"><input type="number" class="form-input" data-field="${path}" value="${value}" step="0.01"><span class="input-unit">${unit}</span></div>
         ${note}
       </div>`;
   },

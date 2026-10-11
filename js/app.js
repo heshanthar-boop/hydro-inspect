@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.9.5',
+  VERSION: '2.9.6',
   currentPage: 'records',
   editingInspectionId: null,
 
@@ -480,9 +480,10 @@ const App = {
       return '<p class="text-sm text-muted mb-8">No meter replacements recorded.</p>';
     }
     return draft.map((mc, i) => {
+      const unit=Calc.channelMeta(mc.channel)?.unit || 'kWh';
       const auto = this._autoClosing(mc.channel, mc.date);
       const autoHint = auto !== null
-        ? `Leave blank to use ${Calc.formatNumber(auto)} kWh, the reading recorded on ${Calc.formatDateFull(mc.date)}`
+        ? `Leave blank to use ${Calc.formatNumber(auto)} ${unit}, the reading recorded on ${Calc.formatDateFull(mc.date)}`
         : 'No reading found on or before this date — enter the closing value';
       const options = Calc.METER_CHANNELS.map(ch =>
         `<option value="${ch.key}" ${ch.key === mc.channel ? 'selected' : ''}>${ch.label}</option>`
@@ -501,14 +502,14 @@ const App = {
           </div>
           <div class="form-group">
             <label class="form-label">Old meter closing</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-mc="oldFinal" value="${Forms.esc(mc.oldFinal || '')}" step="0.01" placeholder="Auto"><span class="input-unit">kWh</span></div>
+            <div class="input-with-unit"><input type="number" class="form-input" data-mc="oldFinal" value="${Forms.esc(mc.oldFinal || '')}" step="0.01" placeholder="Auto"><span class="input-unit">${unit}</span></div>
             <span class="form-hint">${autoHint}</span>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">New meter starts at</label>
-            <div class="input-with-unit"><input type="number" class="form-input" data-mc="newStart" value="${Forms.esc(String(mc.newStart ?? '0'))}" step="0.01"><span class="input-unit">kWh</span></div>
+            <div class="input-with-unit"><input type="number" class="form-input" data-mc="newStart" value="${Forms.esc(String(mc.newStart ?? '0'))}" step="0.01"><span class="input-unit">${unit}</span></div>
           </div>
           <div class="form-group">
             <label class="form-label">Note</label>
