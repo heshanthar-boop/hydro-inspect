@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.9.2',
+  VERSION: '2.9.3',
   currentPage: 'records',
   editingInspectionId: null,
 
@@ -301,9 +301,9 @@ const App = {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (confirm('Delete this inspection record? This cannot be undone.')) {
-          await Store.deleteInspection(btn.dataset.delete);
-          this.navigate('records');
-          this.toast('Record deleted', 'success');
+          btn.disabled=true;
+          try {await Store.deleteInspection(btn.dataset.delete);await this.navigate('records',{refresh:true,history:'none'});this.toast('Record deleted; deletion will sync across devices','success');}
+          catch(error){this.toast('Delete failed: '+error.message,'error');btn.disabled=false;}
         }
       });
     });

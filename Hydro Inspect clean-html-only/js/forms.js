@@ -1204,8 +1204,16 @@ const Forms = {
     });
   },
 
+  hasEnteredData(inspection) {
+    const ignored=new Set(['id','createdAt','updatedAt','general','session','controlSystems']);
+    const populated=value=>Array.isArray(value)?value.some(populated):value && typeof value==='object'?Object.entries(value).some(([key,v])=>!['id','photoIds'].includes(key)&&populated(v)):value!=='' && value!=null && value!==false;
+    return Object.entries(inspection).some(([key,value])=>!ignored.has(key)&&!key.startsWith('_')&&populated(value)) || !!inspection.general?.generalNotes || !!inspection.general?.weatherConditions || !!inspection.general?.timeOfInspection || !!inspection.controlSystems?.controlNotes || ['plcScadaStatus','sensorsStatus'].some(key=>inspection.controlSystems?.[key] && inspection.controlSystems[key]!=='Working Fine');
+  },
+
   async saveDraft() {
     if(!Access.isOwner()) return;
+    const existing=await Store.getInspection(this.currentInspection.id);
+    if(!existing && !this.hasEnteredData(this.currentInspection)) return;
     const status = document.getElementById('inspection-save-state');
     if (status) status.textContent = 'Saving…';
     try { await Store.saveInspection(this.currentInspection); if (status) status.textContent = 'Saved on this device'; }
@@ -1236,7 +1244,7 @@ const Forms = {
 
   async saveAndRefresh(container) {
     this.collectFormData(container);
-    await Store.saveInspection(this.currentInspection);
+    if(this.hasEnteredData(this.currentInspection) || await Store.getInspection(this.currentInspection.id)) await Store.saveInspection(this.currentInspection);
     // Preserve scroll position
     const scrollY = container.scrollTop || window.scrollY;
     await this.init(this.currentInspection, container);
