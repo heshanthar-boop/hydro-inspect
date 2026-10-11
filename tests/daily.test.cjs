@@ -15,4 +15,5 @@ assert.equal(ctx.Daily.calculate({...b,readings:{...b.readings,gen1:'5'}},[a]).v
 ctx.Calc.meterChanges[0].oldFinal='';assert.equal(ctx.Daily.calculate(b,[a]).values.gen1,null);
 assert.equal(ctx.Daily.calculate(b,[{...a,draft:true}]).previous,null);
 const sameDay=ctx.Daily.calculate({...b,date:a.date,time:'12:00'},[a]);assert.equal(sameDay.days,0.125);assert.equal(sameDay.values.cebImport,30);
+assert.equal(ctx.Daily.previous({...b,id:'same',time:'09:00:05'},[{...a,id:'older'},{...b,id:'same'}]).id,'older');
 console.log('Daily calculation regression checks passed');
