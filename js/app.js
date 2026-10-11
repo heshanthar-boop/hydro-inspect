@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.9.13',
+  VERSION: '2.10.0',
   currentPage: 'records',
   editingInspectionId: null,
 
@@ -164,8 +164,8 @@ const App = {
       container.innerHTML = `
         <div class="empty-state">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <p>No inspection records yet.</p>
-          <p class="text-sm text-muted mt-8">Create your first inspection to get started.</p>
+<h2>Inspection library</h2><p>No inspection records yet.</p>
+          <p class="text-sm text-muted mt-8">${Access.isOwner()?'Create your first inspection to get started.':'Submitted inspections will appear here after owner sync.'}</p>
         </div>`;
       return;
     }
@@ -182,7 +182,7 @@ const App = {
           <button class="btn btn-outline btn-sm" id="export-json">Export JSON</button>
         </div>
       </div>
-      <div id="records-list">
+      <div id="records-list" class="inspection-record-grid">
         ${inspections.map(insp => this.renderRecordCard(insp, inspections)).join('')}
       </div>
     `;
