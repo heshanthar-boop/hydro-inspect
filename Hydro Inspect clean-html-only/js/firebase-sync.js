@@ -372,7 +372,7 @@ const FirebaseSync = (() => {
     const col=_userCol('hydro_daily_readings');
     const snapshot=await col.get();
     const remote=new Map(snapshot.docs.map(d=>[d.id,d.data()]));
-    const local=await Store.getDailyReadings();
+    const local=await Store.getDailyReadings({includeDeleted:true});
     const seen=new Set();
     for(const record of local) {
       seen.add(record.id); const r=remote.get(record.id);
@@ -381,7 +381,7 @@ const FirebaseSync = (() => {
       const editable=Access.isOwner() || record.audit?.created?.uid===_user.uid;
       if(editable && (!r || _newerSide(record,r)==='local')) {
         await pushDailyReading(record);
-      } else if(r && (_newerSide(record,r)==='remote' || record._pendingSync || !editable)) await Store.saveDailyReading({...r,_shared:true,_pendingSync:false},{silent:true});
+      } else if(r && (r._deleted || _newerSide(record,r)==='remote' || record._pendingSync || !editable)) await Store.saveDailyReading({...r,_shared:true,_pendingSync:false},{silent:true});
     }
     for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_shared:true,_pendingSync:false},{silent:true});
   }
@@ -399,7 +399,7 @@ const FirebaseSync = (() => {
     const ref=_userCol('hydro_daily_readings').doc(clean.id);
     const result=await _db.runTransaction(async tx=>{
       const snapshot=await tx.get(ref),remote=snapshot.exists ? snapshot.data() : null;
-      if(remote && _newerSide(clean,remote)==='remote') return remote;
+      if(remote && (remote._deleted || (!owner && !remote.draft) || _newerSide(clean,remote)==='remote')) return remote;
       if(remote) clean.audit.created=remote.audit.created;
       if(owner && remote?.readingAt && clean.date===remote.date && clean.time===remote.time) clean.readingAt=remote.readingAt;
       if(!owner) clean.readingAt=remote && !remote.draft && remote.readingAt ? remote.readingAt : firebase.firestore.FieldValue.serverTimestamp();
@@ -407,7 +407,7 @@ const FirebaseSync = (() => {
       return {...clean,_pendingSync:false,_shared:true};
     });
     // Never replace a newer local edit with the result of an older upload.
-    const current=(await Store.getDailyReadings()).find(r=>r.id===clean.id);
+    const current=(await Store.getDailyReadings({includeDeleted:true})).find(r=>r.id===clean.id);
     if(current && current.updatedAt===record.updatedAt) {
       const acknowledged=await ref.get();
       if(acknowledged.exists) await Store.saveDailyReading({...acknowledged.data(),_pendingSync:false,_shared:true},{silent:true});

@@ -477,11 +477,11 @@ const Store = {
 
   // ===== Export / Import =====
 
-  async getDailyReadings() {
+  async getDailyReadings(opts = {}) {
     const db=await this.open();
     return new Promise((resolve,reject)=>{
       const req=db.transaction('dailyReadings','readonly').objectStore('dailyReadings').getAll();
-      req.onsuccess=()=>resolve(req.result.sort((a,b)=>b.date.localeCompare(a.date)));
+      req.onsuccess=()=>resolve(req.result.filter(r=>opts.includeDeleted || !r._deleted).sort((a,b)=>b.date.localeCompare(a.date)));
       req.onerror=()=>reject(req.error);
     });
   },
@@ -490,7 +490,7 @@ const Store = {
     const db=await this.open();
     if(!opts.silent) {
       const existing=(await this.getDailyReadings()).find(r=>r.id===record.id);
-      if(existing && !Access.canEditDaily(existing)) throw new Error('You can only correct readings entered by this visitor or account');
+      if(existing && (!Access.canContinueDaily(existing) || (existing._deleted && !record._deleted))) throw new Error('You can only correct readings entered by this visitor or account');
       const actor=Access.actor();record.audit={created:existing?.audit?.created || actor,lastEdited:actor};
       record.updatedAt=new Date().toISOString(); record._pendingSync=true; }
     await new Promise((resolve,reject)=>{
@@ -499,6 +499,12 @@ const Store = {
     });
     if(!opts.silent && typeof FirebaseSync!=='undefined') FirebaseSync.onDailyReadingSaved(record);
     return record;
+  },
+
+  async deleteDailyReading(id) {
+    if(!Access.isOwner())throw new Error('Only the owner can delete readings');
+    const r=(await this.getDailyReadings({includeDeleted:true})).find(r=>r.id===id);if(!r)return;
+    await this.saveDailyReading({id:r.id,plant:r.plant,date:r.date,time:r.time,operator:r.operator,readings:{},draft:true,_deleted:true,deletedAt:new Date().toISOString()});
   },
 
   async exportData() {
