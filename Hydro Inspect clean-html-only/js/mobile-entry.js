@@ -1,7 +1,11 @@
 /** Mobile-friendly sequential field entry with immediate save on Next. */
 const MobileEntry = {
   active:null,
-  fields() { if(!['daily','new-inspection'].includes(App.currentPage)) return []; return [...document.querySelectorAll('#main-content input:not([type=hidden]):not([type=file]):not([type=checkbox]), #main-content textarea, #main-content select')].filter(el=>el.offsetParent!==null && !el.disabled && !el.readOnly); },
+  fields() {
+    if(!['daily','new-inspection'].includes(App.currentPage)) return [];
+    const root=document.querySelector(App.currentPage==='daily'?'#daily-form':'#main-content');
+    return root ? [...root.querySelectorAll('input:not([type=hidden]):not([type=file]):not([type=checkbox]),textarea,select')].filter(el=>el.offsetParent!==null && !el.disabled && !el.readOnly) : [];
+  },
   move(direction) {
     const input=this.active;if(!input?.isConnected) return;
     // Required blank draft fields can be filled later; malformed numeric values cannot.
@@ -33,6 +37,7 @@ const MobileEntry = {
     };
     window.visualViewport?.addEventListener('resize',()=>{if(!bar.hidden && this.active?.isConnected)this.active.scrollIntoView({block:'center'});});
     const main=document.getElementById('main-content');enhance();new MutationObserver(enhance).observe(main,{childList:true,subtree:true});
+    window.addEventListener('scroll',()=>{if(this.active?.isConnected && document.activeElement===this.active){const rect=this.active.getBoundingClientRect();this.bar.hidden=rect.bottom<80 || rect.top>window.innerHeight-100;}},{passive:true});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(App.currentPage==='daily')Daily.flush?.();if(App.currentPage==='new-inspection')Forms.flush?.();}});
   }
 };
