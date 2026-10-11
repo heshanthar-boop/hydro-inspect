@@ -1,5 +1,7 @@
 /** Daily operator cumulative meter readings, stored separately from inspections. */
 const Daily = {
+  operatorNames: ['Athula','Hirusha','Lasantha','Nalinda','Priyantha','Supun','Upul'],
+  ownerName() {const u=FirebaseSync.getUser();return u?.displayName || u?.email || 'Owner';},
   channels: [
     {key:'cebImport',label:'CEB import'}, {key:'cebExport',label:'CEB export'},
     {key:'gen1',label:'No.1 generator panel',meter:'gen1Panel'},
@@ -36,7 +38,7 @@ const Daily = {
     let records=await Store.getDailyReadings();
     const plants=[...new Set([settings.plantName,...records.map(r=>r.plant)])];
     container.innerHTML=`<div class="page-intro"><span class="eyebrow">OPERATOR DAILY LOG</span><h1>Daily meter readings</h1><p>Enter cumulative kWh readings at a consistent time each day. Daily differences are calculated automatically.</p></div>
-      <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label><input class="form-input" id="daily-operator" list="daily-operators" required placeholder="Choose or enter operator name"><datalist id="daily-operators">${[...new Set(records.map(r=>r.operator).filter(Boolean))].map(name=>`<option value="${Forms.esc(name)}">`).join('')}</datalist></div></div>
+      <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label>${Access.isOwner() ? `<input class="form-input" id="daily-operator" value="${Forms.esc(this.ownerName())}" readonly><small class="form-hint">Using your signed-in account automatically</small>` : `<select class="form-select" id="daily-operator" required><option value="">Choose operator…</option>${this.operatorNames.map(name=>`<option value="${name}">${name}</option>`).join('')}</select>`}</div></div>
       <div class="form-row"><div class="form-group"><label class="form-label">Reading date</label><input class="form-input" type="date" id="daily-date" required value="${DateEntry.localDate()}"></div><div class="form-group"><label class="form-label">Reading time</label><input class="form-input" type="time" id="daily-time" required value="${DateEntry.localTime()}"></div></div>
       <div class="daily-save-bar"><span id="daily-auto-state" role="status">Ready for entry</span><span id="daily-progress">0 / 6 readings</span></div><p id="daily-existing" class="form-hint" role="status"></p><div class="form-row daily-meter-grid">${this.channels.map(ch=>`<div class="form-group"><label class="form-label">${ch.label} — cumulative</label><div class="input-with-unit"><input type="number" class="form-input" data-daily="${ch.key}" min="0" step="0.01" required placeholder="0.00"><span class="input-unit">kWh</span></div></div>`).join('')}</div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="daily-notes" placeholder="Meter change, outage, unusual reading…"></textarea></div>
@@ -56,7 +58,7 @@ const Daily = {
       const invalid=[...form.querySelectorAll('input[type=number]')].find(el=>el.validity.badInput || el.validity.rangeUnderflow || el.validity.rangeOverflow || el.validity.stepMismatch);
       if(invalid){ invalid.setAttribute('aria-invalid','true'); state.textContent='Check the highlighted reading — changes not saved'; return queue; }
       form.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
-      if(!records.some(x=>x.id===r.id) && !r.operator && !r.notes && Object.values(r.readings).every(v=>v==='')) { state.textContent='Ready for entry'; return queue; }
+      if(!records.some(x=>x.id===r.id) && !r.notes && Object.values(r.readings).every(v=>v==='')) { state.textContent='Ready for entry'; return queue; }
       if(records.some(x=>x.id!==r.id && x.plant===r.plant && this.stamp(x)===this.stamp(r))) {state.textContent='A reading already exists at this time. Open it or choose another time.';return queue;}
       r.draft=!r.operator || !r.time || Object.values(r.readings).some(value=>value==='');
       records=this.sort([r,...records.filter(x=>x.id!==r.id)]);
@@ -77,7 +79,11 @@ const Daily = {
       form.querySelectorAll('[data-daily]').forEach(el=>el.value=existing?.readings[el.dataset.daily] ?? '');
       form.querySelector('#daily-time').value=existing?.time || DateEntry.localTime();
       form.querySelector('#daily-notes').value=existing?.notes || '';
-      if(existing) form.querySelector('#daily-operator').value=existing.operator || '';
+      const operator=form.querySelector('#daily-operator');
+      if(existing) {
+        if(operator.tagName==='SELECT' && existing.operator && ![...operator.options].some(o=>o.value===existing.operator)){const legacy=document.createElement('option');legacy.value=existing.operator;legacy.textContent=existing.operator+' (saved entry)';operator.append(legacy);}
+        operator.value=existing.operator || '';
+      } else if(Access.isOwner()) operator.value=this.ownerName();
       form.querySelector('#daily-existing').textContent=existing ? 'Saved entry loaded. Saving will update this record.' : 'New daily entry.';
       state.textContent=existing ? (existing.draft ? 'Saved draft loaded' : 'Saved entry loaded') : 'Ready for entry';
       refresh();
@@ -86,7 +92,7 @@ const Daily = {
     container.querySelector('#daily-new').addEventListener('click',async()=>{const pending=autosave();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=true);await pending;activeId='daily_'+crypto.randomUUID();form.querySelector('#daily-date').value=DateEntry.localDate();load();form.querySelectorAll('input,textarea,select').forEach(el=>el.disabled=false);form.querySelector('[data-daily]').focus();});
     container.querySelector('#daily-history').addEventListener('click',async e=>{const btn=e.target.closest('[data-load-daily]');if(!btn)return;await autosave();const r=records.find(x=>x.id===btn.dataset.loadDaily);if(!r || !Access.canEditDaily(r))return;activeId=r.id;form.querySelector('#daily-date').value=r.date;form.querySelector('#daily-plant').value=r.plant;load();});
     form.querySelectorAll('[data-daily]').forEach(el=>{el.addEventListener('input',refresh);el.addEventListener('change',refresh);});
-    form.querySelectorAll('input:not(#daily-date):not(#daily-plant),textarea').forEach(el=>{
+    form.querySelectorAll('input:not(#daily-date):not(#daily-plant),textarea,select').forEach(el=>{
       el.addEventListener('input',()=>{state.textContent='Unsaved changes';clearTimeout(debounce);debounce=setTimeout(autosave,800);});
       el.addEventListener('change',autosave);
     });
@@ -100,7 +106,7 @@ const Daily = {
       catch(error){App.toast('Save failed: '+error.message,'error');} finally {btn.disabled=false;}
     });
     container.querySelector('#daily-csv').addEventListener('click',()=>this.exportCSV(records.filter(r=>r.plant===collect().plant)));
-    const draft=records.find(r=>r.draft && Access.canEditDaily(r));
+    const draft=records.find(r=>r.draft && Access.canEditDaily(r) && (r.audit?.created?.uid===FirebaseSync.getUser()?.uid || (!r.audit?.created?.uid && r.audit?.created?.deviceId===Access.actor().deviceId)));
     if(draft){activeId=draft.id;form.querySelector('#daily-date').value=draft.date;form.querySelector('#daily-plant').value=draft.plant;}
     load();
   },
