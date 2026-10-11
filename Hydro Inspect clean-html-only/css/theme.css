@@ -163,3 +163,5 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 @media(max-width:650px) { .daily-reference span,.daily-reference small,.daily-reference p { font-size:14px; } .daily-reference strong { font-size:18px; } }
 
 .daily-reference strong { overflow-wrap:anywhere; }
+
+#daily-operator:disabled { color:#075e62;background:#edf7f6;opacity:1; }
