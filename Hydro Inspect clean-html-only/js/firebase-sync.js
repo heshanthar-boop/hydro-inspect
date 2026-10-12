@@ -339,6 +339,7 @@ const FirebaseSync = (() => {
       }
 
       await syncDailyReadings();
+      window.dispatchEvent(new Event('hydro-daily-synced'));
       _setSyncBadge('cloud');
       const parts = [];
       if (pushed)    parts.push(`${pushed} pushed`);
@@ -375,7 +376,7 @@ const FirebaseSync = (() => {
     const local=await Store.getDailyReadings({includeDeleted:true});
     const seen=new Set();
     for(const record of local) {
-      seen.add(record.id); const r=remote.get(record.id);
+      seen.add(record.id); if(record._remoteRemoved)continue; const r=remote.get(record.id);
       if(record.audit && !record._shared && !record.audit.created.uid && record.audit.created.deviceId===Access.actor().deviceId) {record.audit.created.uid=_user.uid;record.audit.lastEdited=Access.actor();}
       if(!record.audit && Access.isOwner()) {const actor=Access.actor();record.audit={created:actor,lastEdited:actor};}
       const editable=Access.isOwner() || record.audit?.created?.uid===_user.uid;
@@ -384,6 +385,28 @@ const FirebaseSync = (() => {
       } else if(r && (r._deleted || _newerSide(record,r)==='remote' || record._pendingSync || !editable)) await Store.saveDailyReading({...r,_shared:true,_pendingSync:false},{silent:true});
     }
     for(const [id,r] of remote) if(!seen.has(id)) await Store.saveDailyReading({...r,id,_shared:true,_pendingSync:false},{silent:true});
+  }
+
+  function watchDailyReadings(onChange,onError) {
+    if(!isSignedIn() || !_db)return ()=>{};
+    let stopped=false,updates=Promise.resolve();
+    const unsubscribe=_userCol('hydro_daily_readings').onSnapshot(snapshot=>{
+      updates=updates.catch(()=>{}).then(async()=>{
+        if(stopped)return;
+        const local=new Map((await Store.getDailyReadings({includeDeleted:true})).map(r=>[r.id,r]));
+        let changed=false;
+        for(const change of snapshot.docChanges()){
+          if(change.doc.metadata.hasPendingWrites)continue;
+          const data={...change.doc.data(),id:change.doc.id,_shared:true,_pendingSync:false};
+          if(change.type==='removed') {data._deleted=true;data._remoteRemoved=true;data.readings={};data.draft=true;}
+          const existing=local.get(data.id);
+          if(existing?._pendingSync && !data._deleted && _newerSide(existing,data)==='local')continue;
+          await Store.saveDailyReading(data,{silent:true});changed=true;
+        }
+        if(changed && !stopped)await onChange();
+      }).catch(error=>{if(!stopped)onError?.(error);});
+    },error=>{if(!stopped)onError?.(error);});
+    return ()=>{stopped=true;unsubscribe();};
   }
 
   let dailyPushQueue=Promise.resolve();
@@ -424,6 +447,7 @@ const FirebaseSync = (() => {
   }
 
   return {
+    watchDailyReadings,
     pushDailyReading,
     syncDailyReadings,
     onDailyReadingSaved,

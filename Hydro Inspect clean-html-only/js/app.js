@@ -3,7 +3,7 @@
  * All store calls are async (IndexedDB).
  */
 const App = {
-  VERSION: '2.10.0',
+  VERSION: '2.10.1',
   currentPage: 'records',
   editingInspectionId: null,
 
@@ -100,7 +100,7 @@ const App = {
     const inspectionId=this.editingInspectionId;
     if(MobileEntry.bar)MobileEntry.bar.hidden=true;
     if(this.currentPage==='new-inspection' && Forms.currentInspection)await Forms.flush?.();
-    if(this.currentPage==='daily'){await Daily.flush?.();DailyCharts.destroy();}
+    if(this.currentPage==='daily'){await Daily.flush?.();Daily.dispose();DailyCharts.destroy();}
     if(token!==this._navigationToken)return;
     Analytics.destroyCharts();this.currentPage=page;this._pageReady=false;
     const activePage=page==='view-inspection'?'records':page;
