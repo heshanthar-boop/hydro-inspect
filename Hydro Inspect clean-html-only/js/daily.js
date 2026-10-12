@@ -31,14 +31,16 @@ const Daily = {
     values.generation=values.gen1!==null && values.gen2!==null ? values.gen1+values.gen2 : null;
     return {previous,days,values,warnings};
   },
+  dispose() {this._stopWatch?.();this._stopWatch=null;this._syncController?.abort();},
   async render(container) {
+    this.dispose();
     const settings=await Store.getSettings();
     await Calc.loadMeterConfig();
     let records=await Store.getDailyReadings();
     if(!container.isConnected)return;
     const plants=[...new Set([settings.plantName,...records.map(r=>r.plant)])];
     container.innerHTML=`<div class="page-intro"><span class="eyebrow">OPERATOR DAILY LOG</span><h1>Daily meter readings</h1><p>Enter each reading in the unit displayed on its meter: panels in MWh; CEB and LT in kWh. Comparisons and charts convert energy changes to kWh automatically.</p></div>
-      <nav class="daily-section-nav" aria-label="Daily page sections"><button type="button" data-daily-jump="daily-form">Enter readings</button><button type="button" data-daily-jump="daily-history-section">Record history</button><button type="button" data-daily-jump="daily-charts">Meter charts</button></nav><div id="daily-overview"></div>
+      <nav class="daily-section-nav" aria-label="Daily page sections"><button type="button" data-daily-jump="daily-form">Enter readings</button><button type="button" data-daily-jump="daily-history-section">Record history</button><button type="button" data-daily-jump="daily-charts">Meter charts</button></nav><p id="daily-live-status" class="form-hint" role="status">Showing saved readings on this device</p><div id="daily-overview"></div>
       <form id="daily-form" class="chart-container"><div class="form-row"><div class="form-group"><label class="form-label">Plant</label><input class="form-input" id="daily-plant" list="daily-plants" required value="${Forms.esc(settings.plantName)}"><datalist id="daily-plants">${plants.map(p=>`<option value="${Forms.esc(p)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">Operator</label><select class="form-select" id="daily-operator" required ${Access.isOwner()?'disabled':''}><option value="">Choose operator…</option>${[...new Set([...this.operatorNames,...(Access.isOwner()?[this.ownerName()]:[])])].sort((a,b)=>a.localeCompare(b)).map(name=>`<option value="${Forms.esc(name)}" ${Access.isOwner()&&name===this.ownerName()?'selected':''}>${Forms.esc(name)}</option>`).join('')}</select>${Access.isOwner()?'<small class="form-hint" id="operator-help">New entries use your signed-in account automatically</small>':''}</div></div>
       <div class="form-row" ${Access.isOwner()?'':'hidden'}><div class="form-group"><label class="form-label">Reading date</label><input class="form-input" type="date" id="daily-date" required value="${DateEntry.localDate()}"></div><div class="form-group"><label class="form-label">Reading time</label><input class="form-input" type="time" id="daily-time" step="1" required value="${DateEntry.localTime()}"></div></div>
       <p class="form-hint">${Access.isOwner()?'You can choose a past reading date/time when needed.':'Reading date and time are recorded automatically when you enter data.'}</p><div class="daily-save-bar"><span id="daily-auto-state" role="status">Ready for entry</span><span id="daily-progress">0 / 6 readings</span></div><p id="daily-existing" class="form-hint" role="status"></p><div class="form-row daily-meter-grid">${this.channels.map(ch=>`<div class="form-group"><label class="form-label">${ch.label} — cumulative</label><div class="daily-reference" data-daily-reference="${ch.key}"></div><div class="input-with-unit"><input type="number" class="form-input" data-daily="${ch.key}" min="0" step="0.01" required placeholder="0.00"><span class="input-unit">${ch.unit}</span></div></div>`).join('')}</div>
@@ -89,7 +91,9 @@ const Daily = {
       form.querySelector('#daily-progress').textContent=`${Object.values(r.readings).filter(v=>v!=='').length} / 6 readings`;container.querySelector('#daily-preview').innerHTML=this.summary(r,records);
       const plantRecords=this.sort(records.filter(x=>x.plant===r.plant));const completed=plantRecords.filter(x=>!x.draft),latest=completed[0];
       container.querySelector('#daily-overview').innerHTML=`<div class="daily-overview-grid"><div><span>Last submitted reading</span><strong>${latest?Forms.esc(this.stamp(latest).replace('T',' ')):'Awaiting first reading'}</strong><small>${latest?Forms.esc(latest.operator):'Submit a complete entry to set a baseline'}</small></div><div><span>Submitted records</span><strong>${completed.length}</strong><small>Used in energy comparisons</small></div><div><span>Unfinished drafts</span><strong>${plantRecords.length-completed.length}</strong><small>Excluded from charts until finished</small></div></div>`;
+      const openTables=[...container.querySelectorAll('.record-details[open]')].map(el=>el.dataset.table);
       container.querySelector('#daily-history').innerHTML=this.history(records.filter(x=>x.plant===r.plant));
+      container.querySelectorAll('.record-details').forEach(el=>el.open=openTables.includes(el.dataset.table));
       DailyCharts.update(container.querySelector('#daily-charts'),records,r.plant);
     };
     const load=()=>{
@@ -132,6 +136,17 @@ const Daily = {
     const draft=records.find(r=>r.draft && Access.canContinueDaily(r) && (r.audit?.created?.uid===FirebaseSync.getUser()?.uid || (!r.audit?.created?.uid && r.audit?.created?.deviceId===Access.actor().deviceId)));
     if(draft){activeId=draft.id;form.querySelector('#daily-date').value=draft.date;form.querySelector('#daily-plant').value=draft.plant;}
     load();
+    const reload=async()=>{
+      if(!container.isConnected)return;
+      await queue;
+      const saved=await Store.getDailyReadings();
+      if(!container.isConnected)return;
+      records=saved;refresh();
+      container.querySelector('#daily-live-status').textContent='Shared readings updated · '+DateEntry.localTime();
+    };
+    this._syncController=new AbortController();
+    window.addEventListener('hydro-daily-synced',reload,{signal:this._syncController.signal});
+    this._stopWatch=FirebaseSync.watchDailyReadings(reload,error=>{if(container.isConnected)container.querySelector('#daily-live-status').textContent='Live update unavailable — saved readings remain visible. Use Sync Now to retry.';});
   },
   summary(record,records) {
     const d=this.calculate(record,records);
@@ -151,7 +166,7 @@ const Daily = {
       const status=r.draft?'Draft':d.warnings.length?'Check reading':r._pendingSync?'Saved locally':r._shared?'Cloud saved':'Saved';
       return `<article class="daily-record-card"><header><div><span class="record-card-date">${Calc.formatDateFull(stamp.slice(0,10))}</span><h3>${Forms.esc(stamp.slice(11))}<small>Sri Lanka time</small></h3><p>${Forms.esc(r.operator || 'Operator not selected')}</p></div><span class="record-status ${r.draft?'is-draft':d.warnings.length?'is-review':'is-complete'}">${status}</span></header><div class="reading-value-grid">${this.channels.map(ch=>`<div><span>${ch.label}</span><strong>${Calc.formatNumber(r.readings[ch.key])} <small>${ch.unit}</small></strong></div>`).join('')}</div>${r.draft?'<p class="draft-notice">Unfinished entry — excluded from charts until submitted.</p>':d.previous?`<div class="record-period-strip"><span>${Forms.esc(this.stamp(d.previous).replace('T',' '))} → ${Forms.esc(stamp.replace('T',' '))}</span><p>Import <strong>${Calc.formatNumber(d.values.cebImport)} kWh</strong> · Export <strong>${Calc.formatNumber(d.values.cebExport)} kWh</strong> · Generator total <strong>${Calc.formatNumber(d.values.generation)} kWh</strong></p></div>`:'<p class="form-hint">Baseline reading — the next submitted record enables energy comparison.</p>'}${r.notes?`<p class="record-note">${Forms.esc(r.notes)}</p>`:''}${d.warnings.map(w=>`<p class="text-danger">${Forms.esc(w)}</p>`).join('')}${Access.isOwner()?`<footer><button type="button" class="btn btn-primary" data-load-daily="${Forms.esc(r.id)}">Edit record</button><button type="button" class="btn btn-danger" data-delete-daily="${Forms.esc(r.id)}">Delete</button></footer>`:''}</article>`;
     }).join('');
-    const detail=(title,content)=>`<details class="record-details"><summary>${title}<span>View table</span></summary><div>${content}</div></details>`;
+    const detail=(title,content)=>`<details class="record-details" data-table="${title}"><summary>${title}<span>View table</span></summary><div>${content}</div></details>`;
     return `<div class="daily-record-grid">${cards}</div>${records.length>12?`<p class="form-hint">Showing the latest 12 of ${records.length} records. All records are available in the tables below.</p>`:''}<div class="record-table-library">${detail('Cumulative meter readings',cumulative)}${detail('Record-to-record energy',differences)}${detail('Daily energy averages',rates)}${detail('Entry audit trail',audit)}</div>`;
 
   },

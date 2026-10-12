@@ -503,7 +503,7 @@ const Store = {
     this.normalizeUnits(record,'dailyReadings');
     const db=await this.open();
     if(!opts.silent) {
-      const existing=(await this.getDailyReadings()).find(r=>r.id===record.id);
+      const existing=(await this.getDailyReadings({includeDeleted:true})).find(r=>r.id===record.id);
       if(existing && (!Access.canContinueDaily(existing) || (existing._deleted && !record._deleted))) throw new Error('You can only correct readings entered by this visitor or account');
       const actor=Access.actor();record.audit={created:existing?.audit?.created || actor,lastEdited:actor};
       record.updatedAt=new Date().toISOString(); record._pendingSync=true; }
