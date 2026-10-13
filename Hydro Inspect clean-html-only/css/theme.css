@@ -222,3 +222,29 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
 .record-history-heading { flex-wrap:wrap;gap:12px;margin-bottom:18px; }
 .record-history-heading h3 { margin-bottom:0; }
 @media(max-width:650px) { .record-history-heading h3 { flex:1 0 100%; } .record-history-heading button { flex:1; } }
+
+/* Compact record drawers with clear mobile value alignment. */
+.record-details summary { display:flex;align-items:center;gap:10px;list-style:none;min-height:60px; }
+.record-details summary::-webkit-details-marker { display:none; }
+.record-details summary::before { content:'›';font-size:24px;color:#087f83;flex-shrink:0;transition:transform .15s; }
+.record-details[open]>summary::before { transform:rotate(90deg); }
+.record-details summary .record-section-title { display:block;float:none;flex:1;min-width:0;font-size:15px;font-weight:700;color:#244e66; }
+.record-details summary .record-section-action { display:block;float:none;font-size:12px;font-weight:650;color:#08777e;flex-shrink:0; }
+.record-details summary .record-count { display:inline-block;float:none;padding:2px 7px;margin-left:5px;border-radius:7px;background:#e3f1f1;color:#176675;font-size:12px;font-weight:700; }
+.entered-records>div { padding:12px 0;background:transparent; }
+.record-table-library { margin-top:0; }
+@media(max-width:650px) {
+  .record-details summary { padding:16px 12px;gap:8px; }
+  .reading-value-grid { grid-template-columns:1fr;gap:0;padding:8px 16px; }
+  .reading-value-grid>div { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid #e2ebf1; }
+  .reading-value-grid>div:last-child { border-bottom:0; }
+  .reading-value-grid strong { margin:0;text-align:right;font-size:23px; }
+  .reading-value-grid span { color:#31566e;font-size:14px; }
+  .daily-record-card header { padding:18px 16px; }
+}
+@media(max-width:380px) {
+  .reading-value-grid>div { display:block; }
+  .reading-value-grid strong { text-align:left;margin-top:5px; }
+  .record-details summary .record-section-title { font-size:14px; }
+  .record-details summary .record-section-action { font-size:12px; }
+}

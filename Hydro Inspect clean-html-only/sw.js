@@ -1,5 +1,5 @@
-const CACHE_NAME = 'hydroinspect-v32';
-const APP_VERSION = '2.10.2';
+const CACHE_NAME = 'hydroinspect-v33';
+const APP_VERSION = '2.10.3';
 
 // Use relative paths so it works on GitHub Pages subpath
 const LOCAL_ASSETS = [
