@@ -6,7 +6,7 @@ import java.util.*;
 public final class ReadingPolicy {
     public static final String PLANT="Kumburutheniwela Mini Hydro Power";
     public static final String[] KEYS={"cebImport","cebExport","gen1","gen2","transformer","lt"};
-    public static final Set<String> OPERATORS=Set.of("Athula","Hirusha","Lasantha","Nalinda","Priyantha","Supun","Upul");
+    public static final Set<String> OPERATORS=Collections.unmodifiableSet(new HashSet<>(Arrays.asList("Athula","Hirusha","Lasantha","Nalinda","Priyantha","Supun","Upul")));
     public static void validate(String operator, Map<String,String> readings) {
         if(!OPERATORS.contains(operator))throw new IllegalArgumentException("Choose an operator");
         for(String key:KEYS) {
