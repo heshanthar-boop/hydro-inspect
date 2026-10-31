@@ -25,7 +25,7 @@ Android schedules background work; battery saver, manufacturer restrictions, for
 
 ## Build and signing
 
-`gradle testReleaseUnitTest lintRelease assembleRelease` from this directory with JDK 17, Gradle 8.13, and Android SDK 36. The GitHub Actions workflow produces a signed APK plus SHA-256 checksum. Release signing uses the repository's `HYDRO_ANDROID_KEYSTORE` and `HYDRO_ANDROID_PASSWORD` secrets. These are never committed. Retain the original signing key for future APK updates; changing the key would require uninstalling the old app. The local backup lives in the ignored `output/signing` directory of the maintainer's checkout.
+Run `npm ci --ignore-scripts` and `node scripts/build-android-assets.cjs` at the repository root, then `gradle testReleaseUnitTest lintRelease assembleRelease` from this directory with JDK 17, Gradle 8.13, and Android SDK 36. Source UI scripts are in `android/ui`; esbuild compiles the packaged scripts and Chart.js for Chrome 61-era Android WebViews. Modern WebViews use responsive charts; older versions use sized canvases with a resize listener. The GitHub Actions workflow produces a signed APK plus SHA-256 checksum. Release signing uses the repository's `HYDRO_ANDROID_KEYSTORE` and `HYDRO_ANDROID_PASSWORD` secrets. These are never committed. Retain the original signing key for future APK updates; changing the key would require uninstalling the old app. The local backup lives in the ignored `output/signing` directory of the maintainer's checkout.
 
 Android app registration: `com.hydroinspect.operator`, Firebase project `solarpv-field-tool`. The public Firebase SDK configuration is initialized programmatically; no service-account credentials are shipped.
 

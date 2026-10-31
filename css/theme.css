@@ -248,3 +248,6 @@ body { background:radial-gradient(ellipse at 15% 0%,#daf2f080,transparent 45%),r
   .record-details summary .record-section-title { font-size:14px; }
   .record-details summary .record-section-action { font-size:12px; }
 }
+/* Installable operator companion. Kept separate from data-page navigation. */
+.android-app-link{display:flex;align-items:center;min-height:48px;padding:12px 20px;color:inherit;text-decoration:none;font-size:15px;font-weight:650;border-top:1px solid #dbe6ec;margin-top:10px}
+.android-app-link:focus-visible{outline:3px solid #087f86;outline-offset:-3px}

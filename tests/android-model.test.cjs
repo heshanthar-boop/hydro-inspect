@@ -16,4 +16,5 @@ assert.equal(M.time(M.stamp(offline)),'2026-10-12 06:30:00','offline captured ti
 const intervals=M.intervals([b,a]);assert.equal(intervals.length,1);
 for(const p of ['reading','day','week','month','year']){const groups=M.aggregate(intervals,p);assert.equal(groups[0].values.deviation,-1420);assert.equal(groups[0].counts.cebExport,1);assert.ok(groups[0].start<groups[0].end);}
 assert.equal(M.format(''), '—');assert.equal(M.format(0),'0');
+assert.equal(M.format('999999999999.123456'),'999,999,999,999.123456','Counter displays preserve all entered digits');
 console.log('Android model: native units, signed deviation, missing/replaced meters, offline chronology, tombstones, and aggregation pass.');

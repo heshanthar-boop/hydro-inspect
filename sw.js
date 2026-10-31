@@ -5,6 +5,7 @@ const APP_VERSION = '2.11.0';
 const LOCAL_ASSETS = [
   './',
   './index.html',
+  './android.html',
   './css/style.css',
   './css/theme.css',
   './js/store.js',
