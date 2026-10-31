@@ -1,0 +1,84 @@
+name: Android APK
+on:
+  push:
+    branches: [main, 'codex/android-*']
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build packaged operator interface
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node scripts/build-android-assets.cjs
+          npm test
+          node tests/android-model.test.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Restore release signing key
+        env:
+          KEYSTORE: ${{ secrets.HYDRO_ANDROID_KEYSTORE }}
+        run: |
+          test -n "$KEYSTORE"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/hydro-release.p12"
+      - name: Test, lint, and build signed APK
+        working-directory: android
+        env:
+          HYDRO_KEYSTORE: ${{ runner.temp }}/hydro-release.p12
+          HYDRO_STORE_PASSWORD: ${{ secrets.HYDRO_ANDROID_PASSWORD }}
+          HYDRO_KEY_PASSWORD: ${{ secrets.HYDRO_ANDROID_PASSWORD }}
+        run: gradle testReleaseUnitTest lintRelease assembleRelease --no-daemon
+      - name: Verify APK signature
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
+          cp android/app/build/outputs/apk/release/app-release.apk HydroInspect-Operator.apk
+          sha256sum HydroInspect-Operator.apk > HydroInspect-Operator.apk.sha256
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify offline startup and durable drafts on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: |
+            adb shell svc wifi disable
+            adb shell svc data disable
+            cd android && gradle connectedDebugAndroidTest --no-daemon
+      - name: Upload Android test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-test-reports
+          path: |
+            android/app/build/reports/
+            android/app/build/outputs/androidTest-results/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HydroInspect-Operator
+          path: |
+            HydroInspect-Operator.apk
+            HydroInspect-Operator.apk.sha256
+          retention-days: 30

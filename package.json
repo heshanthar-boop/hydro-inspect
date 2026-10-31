@@ -10,7 +10,8 @@
     "pack": "npm run make-icon && node node_modules/electron-builder/cli.js --dir",
     "dist": "npm run make-icon && node node_modules/electron-builder/cli.js --win nsis",
     "portable": "npm run make-icon && node scripts/build-portable.js",
-    "test": "node tests/calculations.test.cjs && node tests/daily.test.cjs && node tests/sync.test.cjs && node tests/daily-charts.test.cjs"
+    "test": "node tests/calculations.test.cjs && node tests/daily.test.cjs && node tests/sync.test.cjs && node tests/daily-charts.test.cjs && node tests/android-model.test.cjs",
+    "android:assets": "node scripts/build-android-assets.cjs"
   },
   "build": {
     "appId": "com.hydroinspect.app",
@@ -50,6 +51,7 @@
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
     "electron-packager": "^17.1.2",
+    "esbuild": "0.28.2",
     "png-to-ico": "^2.1.8"
   }
 }

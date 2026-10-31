@@ -17,4 +17,7 @@ assert.equal(ctx.Daily.calculate(b,[{...a,draft:true}]).previous,null);
 const sameDay=ctx.Daily.calculate({...b,date:a.date,time:'12:00'},[a]);assert.equal(sameDay.days,0.125);assert.equal(sameDay.values.cebImport,30);
 assert.equal(ctx.Daily.previous({...b,id:'same',time:'09:00:05'},[{...a,id:'older'},{...b,id:'same'}]).id,'older');
 ctx.Calc.meterChanges=[];const base={...a,readings:{...a.readings,gen1:'221.78',gen2:'735.68',transformer:'946.2'}};const newer={...b,readings:{...b.readings,gen1:'221.78',gen2:'735.78',transformer:'946.3'}};assert.equal(ctx.Daily.calculate(newer,[base]).values.gen2,100);assert.equal(ctx.Daily.calculate(newer,[base]).values.transformer,100);
+const captured=Date.parse('2026-10-09T03:30:00Z')/1000;
+assert.equal(ctx.Daily.stamp({...b,capturedAt:{seconds:captured},readingAt:{seconds:captured+86400}}),'2026-10-09T09:00:00');
+assert.equal(ctx.Daily.calculate({...b,capturedAt:{seconds:captured},readingAt:{seconds:captured+86400}},[a]).days,1,'Android upload time must not change the reading interval');
 console.log('Daily calculation regression checks passed');
