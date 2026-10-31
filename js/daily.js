@@ -9,7 +9,9 @@ const Daily = {
     {key:'transformer',label:'Transformer panel',meter:'transformerPanel',unit:'MWh',factor:1000},
     {key:'lt',label:'LT meter (CEB LV panel)',meter:'cebLVPanel',unit:'kWh',factor:1}
   ],
-  stamp(record) { if(record.readingAt?.seconds){return new Date(record.readingAt.seconds*1000+19800000).toISOString().slice(0,19);} return record.date+'T'+(record.time || '00:00'); },
+  // Android captures the actual offline entry time; readingAt remains the server receipt time.
+  // Owner edits collect fresh date/time fields without carrying the capturedAt override.
+  stamp(record) { const seconds=record.capturedAt?.seconds || record.readingAt?.seconds;if(seconds){return new Date(seconds*1000+19800000).toISOString().slice(0,19);} return record.date+'T'+(record.time || '00:00'); },
   sort(records) { return [...records].sort((a,b)=>this.stamp(b).localeCompare(this.stamp(a))); },
   previous(record, records) { return this.sort(records).find(r=>(!record.id || r.id!==record.id) && r.plant===record.plant && !r.draft && this.stamp(r)<this.stamp(record)) || null; },
   calculate(record, records) {

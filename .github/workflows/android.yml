@@ -1,0 +1,46 @@
+name: Android APK
+on:
+  push:
+    branches: [main, 'codex/android-*']
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Restore release signing key
+        env:
+          KEYSTORE: ${{ secrets.HYDRO_ANDROID_KEYSTORE }}
+        run: |
+          test -n "$KEYSTORE"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/hydro-release.p12"
+      - name: Test, lint, and build signed APK
+        working-directory: android
+        env:
+          HYDRO_KEYSTORE: ${{ runner.temp }}/hydro-release.p12
+          HYDRO_STORE_PASSWORD: ${{ secrets.HYDRO_ANDROID_PASSWORD }}
+          HYDRO_KEY_PASSWORD: ${{ secrets.HYDRO_ANDROID_PASSWORD }}
+        run: gradle testReleaseUnitTest lintRelease assembleRelease --no-daemon
+      - name: Verify APK signature
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
+          cp android/app/build/outputs/apk/release/app-release.apk HydroInspect-Operator.apk
+          sha256sum HydroInspect-Operator.apk > HydroInspect-Operator.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HydroInspect-Operator
+          path: |
+            HydroInspect-Operator.apk
+            HydroInspect-Operator.apk.sha256
+          retention-days: 30

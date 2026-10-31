@@ -32,7 +32,7 @@ const DailyCharts = {
   },
   destroy(){this.charts.forEach(c=>c.destroy());this.charts=[];},
   update(root,records,plant){
-    const filtered=records.filter(r=>r.plant===plant);const signature=JSON.stringify(filtered.map(r=>[r.id,r.date,r.time,r.readingAt,r.draft,r.readings]));
+    const filtered=records.filter(r=>r.plant===plant);const signature=JSON.stringify(filtered.map(r=>[r.id,r.date,r.time,r.readingAt,r.capturedAt,r.draft,r.readings]));
     if(this.root===root && this.signature===signature)return;
     this.root=root;this.signature=signature;this.records=filtered;this.plant=plant;this.render();
   },

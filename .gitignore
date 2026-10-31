@@ -7,4 +7,9 @@ build/
 npm-debug.log*
 
 output/
+android/.gradle/
+android/local.properties
+*.p12
+*.jks
+*.keystore
 node_modules/
