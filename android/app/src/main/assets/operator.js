@@ -10,12 +10,13 @@
   }
   function save(){
     draft.operator=$('operator').value;const error=bridge.saveDraft(JSON.stringify(draft));
+    document.body.classList.toggle('operator-chosen',!!draft.operator);
     $('saved').textContent=error?'Save failed — retry':'Saved on this phone';if(error)notify(error,true);return !error;
   }
   function pending(){return (state.local||[]).filter(r=>r.localState!=='synced');}
   function refresh(initial=false){
     try {
-      state=read();rows=M.records(state);if(initial){draft=state.draft;draft.readings=draft.readings||{};$('operator').value=draft.operator||'';$('notes').value=draft.notes||'';}
+      state=read();rows=M.records(state);if(initial){draft=state.draft;draft.readings=draft.readings||{};$('operator').value=draft.operator||'';$('notes').value=draft.notes||'';document.body.classList.toggle('operator-chosen',!!draft.operator);}
       const waiting=pending().length;$('connection').textContent=state.online?'● Online':'● Offline';$('connection').title='Open sync centre';
       $('queue-badge').hidden=!waiting;$('queue-badge').textContent=waiting;
       $('queue-summary').textContent=waiting?`${waiting} submitted reading${waiting===1?'':'s'} saved on this phone, waiting to sync.`:state.online?'Connected · submitted readings sync automatically.':'Offline · you can enter and submit readings as usual.';
@@ -47,7 +48,7 @@
     const decrease=warning(c,raw);$('delta').className=decrease?'warning':'delta';
     $('delta').textContent=raw!==''&&!valid(raw)?'Use digits and a decimal point. Up to 6 decimal places.':decrease?'Counter is lower than the previous reading. Check the digits, unit, or meter replacement before submitting.':a!==null&&b!==null?'Change: +'+M.format(Math.round((a-b)*c.factor*1e8)/1e8)+' kWh':c.factor===1000?'Enter MWh exactly as displayed. Charts convert the change to kWh.':'Enter kWh exactly as displayed.';
   }
-  function next(){if(!valid(draft.readings[M.channels[step].key])){notify('Enter a valid reading before continuing.',true);$('reading').focus();return;}save();if(step===5)show('review');else{step++;renderMeter();$('meter-card').scrollIntoView({block:'start'});}}
+  function next(){if(!valid(draft.readings[M.channels[step].key])){notify('Enter a valid reading before continuing.',true);$('reading').focus();return;}save();if(step===5)show('review');else{step++;renderMeter();$('reading').focus({preventScroll:true});$('meter-card').scrollIntoView({block:'start'});}}
   function show(name){
     if(page==='entry'||page==='review')save();page=name;
     for(const el of document.querySelectorAll('.page'))el.hidden=el.id!==name;
@@ -79,10 +80,10 @@
   }
   function renderCharts(){
     chartInstances.forEach(c=>c.destroy());chartInstances=[];
-    const synced=rows.filter(r=>r.localState==='synced');const intervals=M.intervals(synced,state.meterChanges),groups=M.aggregate(intervals,$('period').value);
+    const synced=rows.filter(r=>r.localState==='synced');const intervals=M.intervals(synced,state.meterChanges),allGroups=M.aggregate(intervals,$('period').value),groups=allGroups.slice(-24);
     if(!groups.length){$('chart-content').innerHTML='<p class="empty">Charts need two synced complete readings. Submit your round and connect to update them.</p>';return;}
     const specs=[{title:'CEB import & generation',keys:['cebImport','gen1','gen2','transformer']},{title:'CEB export & LT consumption',keys:['cebExport','lt']},{title:'CEB import − transformer',keys:['deviation']}];
-    $('chart-content').innerHTML=`<p class="legend-note">Synced records only · ${intervals.length} recorded intervals. Pending uploads appear after sync. Totals are assigned to each interval’s ending period; gaps and boundary-spanning intervals are not daily estimates.</p>${specs.map((s,i)=>`<section class="panel"><h2>${s.title}</h2><p class="chart-period">From ${esc(M.time(groups[0].start))}<br>To ${esc(M.time(groups.at(-1).end))} · Sri Lanka</p><div class="chart-overflow"><div class="chart-inner"><div class="chart-frame"><canvas id="chart-${i}" aria-label="${s.title} in kWh" role="img"></canvas></div></div></div>${i===2?'<p class="legend-note">Positive: CEB import is higher. Negative: transformer energy is higher. LT is not subtracted.</p>':''}<details><summary>View period values & coverage</summary><div class="coverage">${groups.map(g=>`<div class="interval"><b>${esc(g.key)}</b><br>${esc(M.time(g.start))}<br>→ ${esc(M.time(g.end))}${s.keys.map(k=>`<div class="meter-row"><span>${esc(M.channels.find(c=>c.key===k)?.name||'Deviation')}<small>${g.counts[k]||0} / ${g.count} valid intervals</small></span><strong>${esc(M.format(g.values[k]))}<small>kWh</small></strong></div>`).join('')}</div>`).join('')}</div></details></section>`).join('')}<p class="legend-note">A dash means missing, decreasing, or replaced counter data. Zero is a measured zero. Known meter replacements are excluded here; use the owner workspace for replacement-adjusted comparisons.</p>`;
+    $('chart-content').innerHTML=`<p class="legend-note">Synced records only · ${intervals.length} recorded intervals. Showing the latest ${groups.length} of ${allGroups.length} periods. Pending uploads appear after sync. Totals are assigned to each interval’s ending period; gaps and boundary-spanning intervals are not daily estimates.</p>${specs.map((s,i)=>`<section class="panel"><h2>${s.title}</h2><p class="chart-period">From ${esc(M.time(groups[0].start))}<br>To ${esc(M.time(groups.at(-1).end))} · Sri Lanka</p><div class="chart-overflow"><div class="chart-inner"><div class="chart-frame"><canvas id="chart-${i}" aria-label="${s.title} in kWh" role="img"></canvas></div></div></div>${i===2?'<p class="legend-note">Positive: CEB import is higher. Negative: transformer energy is higher. LT is not subtracted.</p>':''}<details><summary>View period values & coverage</summary><div class="coverage">${groups.map(g=>`<div class="interval"><b>${esc(g.key)}</b><br>${esc(M.time(g.start))}<br>→ ${esc(M.time(g.end))}${s.keys.map(k=>`<div class="meter-row"><span>${esc(M.channels.find(c=>c.key===k)?.name||'Deviation')}<small>${g.counts[k]||0} / ${g.count} valid intervals</small></span><strong>${esc(M.format(g.values[k]))}<small>kWh</small></strong></div>`).join('')}</div>`).join('')}</div></details></section>`).join('')}<p class="legend-note">A dash means missing, decreasing, or replaced counter data. Zero is a measured zero. Known meter replacements are excluded here; use the owner workspace for replacement-adjusted comparisons.</p>`;
     specs.forEach((s,i)=>{
       const canvas=$('chart-'+i);canvas.parentElement.parentElement.style.minWidth=Math.max(280,groups.length*85)+'px';
       const config={type:'bar',data:{
@@ -110,7 +111,7 @@
   });
   for(const b of document.querySelectorAll('nav button'))b.addEventListener('click',()=>show(b.dataset.page));
   $('history-search').addEventListener('input',()=>{historyLimit=20;renderHistory();});$('more-history').addEventListener('click',()=>{historyLimit+=20;renderHistory();});
-  $('period').addEventListener('change',renderCharts);$('owner').addEventListener('click',()=>bridge.owner());
+  $('period').addEventListener('change',renderCharts);$('owner').addEventListener('click',()=>bridge.owner());$('backup').addEventListener('click',()=>bridge.backup());
   $('connection').addEventListener('click',()=>show('sync'));$('sync-now').addEventListener('click',()=>{bridge.sync();notify(state.online?'Sync scheduled. The queue will update after the server confirms.':'You are offline. Sync is scheduled for when internet returns.');});
   window.operatorBack=()=>{if(page!=='entry'){show('entry');return;}save();bridge.close();};
   document.addEventListener('visibilitychange',()=>{if(document.hidden)save();else refresh();});

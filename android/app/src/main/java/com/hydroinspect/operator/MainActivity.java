@@ -120,7 +120,22 @@ public class MainActivity extends Activity {
                 SyncWorker.enqueue(MainActivity.this);return "";
             }catch(Exception e){return e.getMessage()==null?"Could not save reading. Please retry.":e.getMessage();}
         }
-        @JavascriptInterface public void sync(){SyncWorker.enqueue(MainActivity.this);}
+        @JavascriptInterface public void sync(){store.retryAttention();SyncWorker.enqueue(MainActivity.this);}
+        @JavascriptInterface public void backup(){
+            try {
+                String json=new JSONObject().put("format","hydroinspect-android-backup-v1").put("exportedAt",Instant.now().toString())
+                    .put("draft",getDraft()).put("submitted",store.rows(false)).toString(2);
+                java.io.File dir=new java.io.File(getCacheDir(),"backups");dir.mkdirs();
+                java.io.File file=new java.io.File(dir,"HydroInspect-readings.json");
+                try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){out.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+                Uri uri=androidx.core.content.FileProvider.getUriForFile(MainActivity.this,getPackageName()+".files",file);
+                runOnUiThread(()->{
+                    Intent share=new Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_SUBJECT,"HydroInspect reading backup")
+                        .putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(share,"Save or share reading backup"));
+                });
+            }catch(Exception ignored){}
+        }
         @JavascriptInterface public void owner(){runOnUiThread(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://heshanthar-boop.github.io/hydro-inspect/#daily"))));}
         @JavascriptInterface public void close(){runOnUiThread(()->finish());}
     }

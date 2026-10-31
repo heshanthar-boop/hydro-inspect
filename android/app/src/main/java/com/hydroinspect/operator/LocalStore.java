@@ -7,7 +7,8 @@ import org.json.*;
 
 /** SQLite is the durable source of truth for drafts and the immutable upload outbox. */
 public class LocalStore extends SQLiteOpenHelper {
-    public LocalStore(Context c) { super(c, "operator.db", null, 1); }
+    public LocalStore(Context c) { this(c,"operator.db"); }
+    LocalStore(Context c,String databaseName) { super(c,databaseName,null,1); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE readings(id TEXT PRIMARY KEY, payload TEXT NOT NULL, state TEXT NOT NULL, error TEXT NOT NULL DEFAULT '')");
         db.execSQL("CREATE TABLE cache(id TEXT PRIMARY KEY, payload TEXT NOT NULL)");
@@ -42,6 +43,10 @@ public class LocalStore extends SQLiteOpenHelper {
     public synchronized void mark(String id,String state,String error) {
         ContentValues v=new ContentValues();v.put("state",state);v.put("error",error);
         getWritableDatabase().update("readings",v,"id=?",new String[]{id});
+    }
+    public synchronized void retryAttention() {
+        ContentValues v=new ContentValues();v.put("state","pending");v.put("error","");
+        getWritableDatabase().update("readings",v,"state='attention'",null);
     }
     public synchronized void cache(String id,JSONObject r) {
         ContentValues v=new ContentValues();v.put("id",id);v.put("payload",r.toString());
