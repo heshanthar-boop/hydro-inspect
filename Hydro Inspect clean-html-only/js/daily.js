@@ -10,7 +10,7 @@ const Daily = {
     {key:'lt',label:'LT meter (CEB LV panel)',meter:'cebLVPanel',unit:'kWh',factor:1}
   ],
   // Android captures the actual offline entry time; readingAt remains the server receipt time.
-  // Owner edits collect fresh date/time fields without carrying the capturedAt override.
+  // Owner corrections preserve capture time unless the owner changes date/time.
   stamp(record) { const seconds=record.capturedAt?.seconds || record.readingAt?.seconds;if(seconds){return new Date(seconds*1000+19800000).toISOString().slice(0,19);} return record.date+'T'+(record.time || '00:00'); },
   sort(records) { return [...records].sort((a,b)=>this.stamp(b).localeCompare(this.stamp(a))); },
   previous(record, records) { return this.sort(records).find(r=>(!record.id || r.id!==record.id) && r.plant===record.plant && !r.draft && this.stamp(r)<this.stamp(record)) || null; },
@@ -55,7 +55,9 @@ const Daily = {
     const collect=()=>{
       const existing=records.find(r=>r.id===activeId);
       if(!Access.isOwner() && (!existing || existing.draft)){const now=new Date();const local=new Date(now.getTime()+19800000).toISOString();form.querySelector('#daily-date').value=local.slice(0,10);form.querySelector('#daily-time').value=local.slice(11,19);}
-      return ({id:activeId,plant:form.querySelector('#daily-plant').value.trim(),date:form.querySelector('#daily-date').value,time:form.querySelector('#daily-time').value,operator:form.querySelector('#daily-operator').value.trim(),readingAt:existing && !existing.draft && existing.date===form.querySelector('#daily-date').value && existing.time===form.querySelector('#daily-time').value ? existing.readingAt : undefined,units:Object.fromEntries(this.channels.map(ch=>[ch.key,ch.unit])),notes:form.querySelector('#daily-notes').value,readings:Object.fromEntries([...form.querySelectorAll('[data-daily]')].map(el=>[el.dataset.daily,el.value]))});
+      const sameTime=existing && !existing.draft && existing.date===form.querySelector('#daily-date').value && existing.time===form.querySelector('#daily-time').value;
+      const correctedCapture=!sameTime && existing?.source==='android-operator' ? Date.parse(form.querySelector('#daily-date').value+'T'+form.querySelector('#daily-time').value+'+05:30') : NaN;
+      return ({id:activeId,plant:form.querySelector('#daily-plant').value.trim(),date:form.querySelector('#daily-date').value,time:form.querySelector('#daily-time').value,operator:form.querySelector('#daily-operator').value.trim(),readingAt:sameTime || existing?.source==='android-operator'?existing.readingAt:undefined,capturedAt:sameTime?existing.capturedAt:Number.isFinite(correctedCapture)?{seconds:correctedCapture/1000,nanoseconds:0}:undefined,capturedAtMillis:sameTime?existing.capturedAtMillis:Number.isFinite(correctedCapture)?correctedCapture:undefined,source:existing?.source,timestampSource:sameTime?existing.timestampSource:existing?.source==='android-operator'?'owner-entered':undefined,units:Object.fromEntries(this.channels.map(ch=>[ch.key,ch.unit])),notes:form.querySelector('#daily-notes').value,readings:Object.fromEntries([...form.querySelectorAll('[data-daily]')].map(el=>[el.dataset.daily,el.value]))});
     };
     let queue=Promise.resolve();
     let debounce;
